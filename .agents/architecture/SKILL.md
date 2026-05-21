@@ -1,36 +1,27 @@
 ---
 name: architecture
 description: >
-  Architectural fundamentals for any codebase: package and module isolation,
+  Architectural fundamentals for the cpp_screener codebase: package and module isolation,
   dependency direction, ports and adapters, public versus internal surfaces.
-  Load when designing a new package, adding cross-package dependencies,
-  changing public exports, or evaluating whether code lives in the right
-  place. Stack-agnostic — the principles are identical in TypeScript, Rust,
-  C++, Python, Go.
+  Load when designing a new C++ module, adding cross-module dependencies,
+  changing public exports, or evaluating whether code lives in the right place.
 ---
 
 # Architecture
 
-> One codebase, many packages. Each package owns a domain. Boundaries are
+> One codebase, many modules. Each module owns a domain. Boundaries are
 > explicit, enforced, and respected. Dependencies flow one way.
 
 ---
 
 ## The Principle
 
-A codebase is a graph of packages (or modules, crates, libraries — the name
-depends on the stack). Each node owns a coherent responsibility. Each edge
+A codebase is a graph of modules. Each node owns a coherent responsibility. Each edge
 is a deliberate dependency from a higher-level package to a lower-level one.
-
-The principle is identical across stacks:
 
 | Stack | Unit of isolation | Public surface | Internal surface |
 |---|---|---|---|
-| TypeScript (pnpm/turbo) | Workspace package | `package.json` `exports` field | Files outside `exports` |
-| Rust | Crate in a workspace | `pub` items in `lib.rs` / module root | `pub(crate)` and below |
-| C++ | Internal library / target | Public headers in `include/<lib>/` | `src/` private headers |
-| Python | Namespace package | `__init__.py` exports / `__all__` | `_private` modules and names |
-| Go | Module | Exported identifiers (capitalized) | Unexported (lowercase) |
+| C++ | Internal library / target | Public headers in `include/trader/<lib>/` | `src/<lib>/` private headers |
 
 The unit, syntax, and tooling change. The discipline does not.
 
@@ -60,22 +51,22 @@ The unit, syntax, and tooling change. The discipline does not.
 Most non-trivial codebases divide into three layers. The names vary; the
 shape is the same.
 
-```
+```text
 ┌────────────────────────────────────────────────┐
 │  Application / Composition / Entry             │  ← composes layers below
-│  (apps, services, CLIs, web routes)            │
+│  (trader-engine main, web routes, alerts)      │
 ├────────────────────────────────────────────────┤
 │  Domain / Core / Logic                         │  ← pure logic, no I/O
-│  (entities, use cases, algorithms)             │
+│  (screens, regime, core types)                 │
 ├────────────────────────────────────────────────┤
 │  Infrastructure / Adapters / Platform          │  ← I/O lives here
-│  (database, HTTP clients, filesystem, queues)  │
+│  (SQLite store, Saxo API, WebSocket streaming) │
 └────────────────────────────────────────────────┘
 ```
 
 **Dependency direction:** Application depends on Domain. Domain depends on
 abstract Ports. Infrastructure implements those Ports. Domain never imports
-Infrastructure.
+Infrastructure implementations.
 
 This is the Ports and Adapters pattern (sometimes called Hexagonal or Clean
 Architecture). Names vary, principle is fixed.
@@ -85,81 +76,31 @@ Architecture). Names vary, principle is fixed.
 ## Ports and Adapters
 
 A **Port** is an interface owned by the Domain that names a capability it
-needs (`UserRepository`, `Clock`, `PaymentGateway`).
+needs (e.g., `BrokerAdapter`, `TimeSeriesStore`).
 
 An **Adapter** is an Infrastructure implementation of a Port
-(`PostgresUserRepository`, `SystemClock`, `StripePaymentGateway`).
+(e.g., `SaxoBrokerAdapter`, `SQLiteStore`).
 
 The Domain depends on the Port. The Application wires the Adapter in at
 composition time. The Domain never knows which Adapter it received.
 
-This is what makes the code portable, testable, and swappable. It is also
-how you keep the functional core pure (see `functional-core` skill).
-
 ---
 
-## Public vs Internal Surface — Expression by Stack
-
-### TypeScript (pnpm / turbo workspace)
-
-```jsonc
-// packages/orders/package.json
-{
-  "name": "@app/orders",
-  "exports": {
-    ".": "./src/index.ts",
-    "./types": "./src/types.ts"
-  }
-}
-```
-
-Anything not listed in `exports` is internal. Deep imports like
-`@app/orders/src/internal/state` are forbidden and should be caught by
-lint rules.
-
-### Rust (workspace with crates)
-
-```rust
-// crates/orders/src/lib.rs
-pub mod api;          // ← public surface
-pub mod types;        // ← public surface
-pub(crate) mod state; // ← internal to this crate
-mod parser;           // ← private to this module
-```
-
-Only `pub` items at the crate root or in `pub mod` paths are accessible
-from other crates.
+## Public vs Internal Surface — Expression in C++
 
 ### C++ (CMake target with public headers)
 
-```
-libs/orders/
-├── include/orders/      ← public headers (target_include_directories PUBLIC)
-│   ├── api.hpp
-│   └── types.hpp
-└── src/                 ← private (target_include_directories PRIVATE)
-    ├── state.hpp
-    └── parser.cpp
-```
-
-Only `include/orders/*.hpp` is consumable. Consumers `#include <orders/api.hpp>`,
-never `#include "../../libs/orders/src/state.hpp"`.
-
-### Python (namespace package)
-
-```python
-# orders/__init__.py
-from ._api import place_order, cancel_order
-from ._types import Order, OrderStatus
-
-__all__ = ["place_order", "cancel_order", "Order", "OrderStatus"]
-
-# orders/_state.py    ← internal (underscore prefix)
-# orders/_parser.py   ← internal
+```text
+trader/
+├── include/trader/broker/      ← public headers (target_include_directories PUBLIC)
+│   ├── broker_adapter.hpp
+│   └── saxo_adapter.hpp
+└── src/broker/                 ← private (target_include_directories PRIVATE)
+    └── saxo_adapter.cpp
 ```
 
-The underscore convention is enforced by code review and lint
-configuration (`flake8`/`ruff` rules against importing `_private`).
+Only `include/trader/**/*.hpp` is consumable. Consumers `#include <trader/broker/broker_adapter.hpp>`,
+never `#include "../../src/broker/internal_state.hpp"`.
 
 ---
 
@@ -181,7 +122,7 @@ Before creating one, ask:
 
 ## When Adding a Cross-Package Dependency
 
-```
+```text
 1. Check the layer rule: is this dependency flowing the correct direction?
 2. Check for cycles: does the target depend on this package, directly or
    transitively? If yes, redesign — extract the shared concept to a lower
@@ -198,9 +139,7 @@ Before creating one, ask:
   depends on and that grows without bound. Break it up by domain.
 - **Backwards dependency.** Domain importing Infrastructure. Stop and
   introduce a Port.
-- **Cross-package internals.** Importing `@app/orders/src/internal/x`,
-  `crate::orders::state` from outside the crate, `#include
-  "../orders/src/state.hpp"`. Reject the change.
+- **Cross-package internals.** `#include "../src/state.hpp"`. Reject the change.
 - **Hidden coupling.** Two packages that share a database table, a global
   singleton, or a mutable module-level state without a declared interface.
   This is a dependency in disguise — make it explicit or remove it.
@@ -211,4 +150,4 @@ Before creating one, ask:
 
 ## The Architecture Mantra
 
-> **"One package, one reason. Dependencies flow down. Public is a promise. Internal is a secret."**
+> **"One module, one reason. Dependencies flow down. Public is a promise. Internal is a secret."**
