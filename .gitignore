@@ -1,0 +1,28 @@
+# CMake
+build/
+CMakeCache.txt
+CMakeFiles/
+Makefile
+*.cmake
+*.dir/
+
+# Compiled object files
+*.o
+*.obj
+
+# Executables
+*.exe
+*.out
+*.app
+trader-engine
+
+# Temporary / Scratch
+scratch/
+.scratch/
+
+# Environments
+.env
+
+# Token databases
+data/
+*.db

@@ -12,7 +12,7 @@ description: >
 
 - **Name:** cpp_screener
 - **Purpose (one sentence):** A multi-instrument, multi-asset-class market screener and alert engine that evaluates independent screen modules against a wide universe, gates by market regime, and emits alerts.
-- **Primary stack:** C++17/C++20, SQLite, Crow/Drogon (HTTP/WS), Vanilla JS (UI)
+- **Primary stack:** C++17/C++20, SQLite, Crow/Drogon (HTTP/WS), React (UI)
 - **Repository layout:** Monolithic C++ Application
 - **Build orchestrator:** CMake
 
@@ -26,7 +26,7 @@ cpp_screener/
 ├── config/                     ← Engine config (ports, thresholds, universe, screens) and secrets
 ├── include/trader/             ← Public headers (interfaces, core types, shared structures)
 ├── src/                        ← Implementation files and private headers
-├── ui/                         ← Web UI assets (Vanilla JS, HTML, CSS)
+├── ui/                         ← React SPA (Vite) utilizing Prisma UI components
 ├── scripts/                    ← Helper scripts (backfill history, run backtests)
 ├── tests/                      ← GoogleTest unit and replay tests
 ├── docs/                       ← Specifications and architectural notes
@@ -48,7 +48,7 @@ cpp_screener/
 | Regime classification | `src/regime/` | `snake_case.cpp` |
 | Database store / schemas | `src/persistence/` | `snake_case.cpp` |
 | Configuration | `config/` | `*.yaml` or `*.env` |
-| Frontend components | `ui/` | Vanilla JS, `*.js`, `*.html` |
+| Frontend components | `ui/src/` | React TSX, `*.tsx`, `*.ts` |
 | Unit tests | `tests/unit/` | `*_test.cpp` |
 | Integration/Replay tests | `tests/replay/` | `*_test.cpp` |
 
@@ -73,12 +73,17 @@ core/*                      ← pure, dependency-free types (Price, Timestamp, I
 ## Build, Run, Test
 
 ```bash
-# Configure and build
+# Configure and build backend
 mkdir -p build && cd build
 cmake ..
 make -j4
 
-# Run engine
+# Build UI
+cd ui
+npm install
+npm run build
+
+# Run engine (will serve ui/dist)
 ./trader-engine
 
 # Run tests

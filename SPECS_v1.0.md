@@ -157,8 +157,9 @@ trader-engine/
 ├── src/                           # Mirrors include/ structure
 ├── ui/
 │   ├── index.html
-│   ├── dashboard.js               # Vanilla JS, no framework needed
-│   └── style.css
+│   ├── src/                       # React SPA using Prisma UI
+│   ├── package.json               # Vite project configuration
+│   └── vite.config.ts
 ├── scripts/
 │   ├── backfill_history.cpp       # One-shot historical data import
 │   └── run_backtest.cpp           # Replay screens against history
