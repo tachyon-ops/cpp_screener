@@ -11,6 +11,8 @@
 #include "trader/persistence/sqlite_store.hpp"
 #include "trader/broker/saxo_adapter.hpp"
 #include "trader/web/http_server.hpp"
+#include "trader/core/regime_classifier.hpp"
+#include "trader/screens/screen_d.hpp"
 #include <webview.h>
 
 
@@ -29,6 +31,15 @@ std::string get_current_utc_timestamp() {
     auto time = std::chrono::system_clock::to_time_t(now);
     std::stringstream ss;
     ss << std::put_time(std::gmtime(&time), "%Y-%m-%dT%H:%M:%SZ");
+    return ss.str();
+}
+
+// Helper to get current UTC date
+std::string get_current_utc_date() {
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << std::put_time(std::gmtime(&time), "%Y-%m-%d");
     return ss.str();
 }
 
@@ -85,10 +96,20 @@ int main() {
                   << "). Running in simulated-quote mode." << std::endl;
     }
 
+    // 3.5 Initialize RegimeClassifier & ScreenD
+    auto classifier = std::make_shared<core::RegimeClassifier>(store);
+    auto screen_d = std::make_shared<screens::ScreenD>(store);
+
     // 4. Initialize and start HTTP & WebSocket Server
     // Serving built React files from "./ui/dist"
-    auto http_server = std::make_shared<web::HttpServer>(store, saxo_adapter, "./ui/dist", 8080);
+    auto http_server = std::make_shared<web::HttpServer>(store, saxo_adapter, classifier, screen_d, "./ui/dist", 8080);
     http_server->start();
+
+    // Prime the data with an initial evaluation
+    std::string today_date = get_current_utc_date();
+    std::cout << "[Engine] Seeding/Calculating initial EOD regime and Screen D rotation board..." << std::endl;
+    classifier->evaluate(today_date, 14.5, 3.25, 0.76, 520.0);
+    screen_d->evaluate(today_date);
 
     // 5. Seed sample regime & alerts if tables are empty, so the UI is immediately wowed
     if (store->get_alerts(1).empty()) {
@@ -139,6 +160,7 @@ int main() {
 
     // 6. Subscribe to live quotes on seeded instruments to simulate screener data feed
     std::cout << "[Engine] Connecting quote subscriptions to core screener feed..." << std::endl;
+    existing_instruments = store->get_instruments();
     for (const auto& inst : existing_instruments) {
         core::InstrumentId id;
         id.broker = "saxo";
@@ -159,81 +181,119 @@ int main() {
     }
 
     // 7. Background screener thread to periodically evaluate regimes & screens
-    std::thread screener_thread([store, http_server]() {
+    std::thread screener_thread([store, http_server, classifier, screen_d]() {
         std::random_device rd;
         std::mt19937 gen(rd());
-        std::uniform_real_distribution<> vix_dist(12.0, 22.0);
-        std::uniform_real_distribution<> breadth_dist(0.3, 0.9);
-        std::vector<std::string> regimes = {"bull", "chop", "stress", "crisis"};
-        std::uniform_int_distribution<> regime_dist(0, regimes.size() - 1);
-        std::uniform_int_distribution<> alert_chance(1, 10);
+        std::normal_distribution<> vix_walk(0.0, 0.4);
+        std::normal_distribution<> oas_walk(0.0, 0.05);
+        std::normal_distribution<> breadth_walk(0.0, 0.02);
+        std::normal_distribution<> spy_walk(0.1, 1.5);
+
+        double vix = 14.5;
+        double hy_oas = 3.25;
+        double breadth = 0.76;
+        double spy_price = 520.0;
 
         while (run_engine) {
-            std::this_thread::sleep_for(std::chrono::seconds(10));
+            std::this_thread::sleep_for(std::chrono::seconds(15));
             if (!run_engine) break;
 
-            // Random walk/simulate regime updates
-            persistence::DbRegimeLog r;
-            r.ts = get_current_utc_timestamp();
-            r.regime = regimes[regime_dist(gen)];
-            r.vix = vix_dist(gen);
-            r.breadth = breadth_dist(gen);
-            r.hy_oas = r.vix * 0.25;
-            r.spx_vs_200ma = (r.regime == "bull" ? 0.05 : (r.regime == "crisis" ? -0.08 : -0.01));
-            r.detail_json = "{\"simulated\":true}";
+            // Random walk macro updates
+            vix += vix_walk(gen);
+            if (vix < 9.0) vix = 9.0;
+            if (vix > 45.0) vix = 45.0;
 
-            store->add_regime_log_async(r);
+            hy_oas += oas_walk(gen);
+            if (hy_oas < 1.5) hy_oas = 1.5;
+            if (hy_oas > 8.0) hy_oas = 8.0;
 
-            nlohmann::json r_json;
-            r_json["ts"] = r.ts;
-            r_json["regime"] = r.regime;
-            r_json["vix"] = r.vix;
-            r_json["breadth"] = r.breadth;
-            r_json["hy_oas"] = r.hy_oas;
-            r_json["spx_vs_200ma"] = r.spx_vs_200ma;
-            r_json["detail"] = nlohmann::json::object();
-            http_server->broadcast_regime(r_json.dump());
+            breadth += breadth_walk(gen);
+            if (breadth < 0.1) breadth = 0.1;
+            if (breadth > 0.99) breadth = 0.99;
 
-            // Low chance of generating a new screen alert
-            if (alert_chance(gen) > 7) {
-                auto insts = store->get_instruments();
-                if (!insts.empty()) {
-                    std::uniform_int_distribution<> inst_dist(0, insts.size() - 1);
-                    const auto& target_inst = insts[inst_dist(gen)];
+            spy_price += spy_walk(gen);
+            if (spy_price < 200.0) spy_price = 200.0;
 
-                    std::vector<std::string> screens = {"A", "B", "C", "D", "E", "F", "G"};
-                    std::uniform_int_distribution<> screen_dist(0, screens.size() - 1);
-                    std::string selected_screen = screens[screen_dist(gen)];
+            std::string date = get_current_utc_date();
 
-                    persistence::DbAlert a;
-                    a.ts = get_current_utc_timestamp();
-                    a.screen = selected_screen;
-                    a.instrument_id = target_inst.id;
-                    a.tier = (selected_screen == "B" || selected_screen == "F" ? "premium" : "opportunity");
-                    
-                    nlohmann::json payload;
-                    payload["symbol"] = target_inst.symbol;
-                    payload["price"] = 100.0 + (inst_dist(gen) * 15.2);
-                    payload["trigger"] = "Screen " + selected_screen + " event triggered on " + target_inst.symbol;
-                    
-                    a.payload_json = payload.dump();
-                    a.regime_at_alert = r.regime;
-                    a.acted_on = 0;
+            // Run calculations
+            core::Regime regime = classifier->evaluate(date, vix, hy_oas, breadth, spy_price);
+            screen_d->evaluate(date);
 
-                    int64_t alert_id = store->add_alert(a);
-                    a.id = alert_id;
+            // Fetch the updated log to broadcast
+            auto logs = store->get_regime_log(1);
+            if (!logs.empty()) {
+                const auto& log = logs[0];
+                nlohmann::json r_json;
+                r_json["ts"] = log.ts;
+                r_json["regime"] = log.regime;
+                r_json["vix"] = log.vix;
+                r_json["breadth"] = log.breadth;
+                r_json["hy_oas"] = log.hy_oas;
+                r_json["spx_vs_200ma"] = log.spx_vs_200ma;
+                try {
+                    r_json["detail"] = nlohmann::json::parse(log.detail_json);
+                } catch (...) {
+                    r_json["detail"] = log.detail_json;
+                }
+                http_server->broadcast_regime(r_json.dump());
+            }
 
-                    nlohmann::json alert_json;
-                    alert_json["id"] = a.id;
-                    alert_json["ts"] = a.ts;
-                    alert_json["screen"] = a.screen;
-                    alert_json["instrument_id"] = a.instrument_id;
-                    alert_json["tier"] = a.tier;
-                    alert_json["payload"] = payload;
-                    alert_json["regime_at_alert"] = a.regime_at_alert;
-                    alert_json["acted_on"] = a.acted_on;
+            // Look through Screen D results to find MA tests or crossovers to trigger real alerts
+            auto screen_results = screen_d->get_results();
+            for (const auto& res : screen_results) {
+                bool trigger_alert = false;
+                std::string trigger_reason;
+                std::string tier = "opportunity";
+                
+                if (res.cross_50_200 && (std::uniform_int_distribution<>(1, 10)(gen) <= 2)) {
+                    trigger_alert = true;
+                    trigger_reason = "50-day and 200-day MA crossover detected";
+                    tier = "premium";
+                } else if ((res.test_50ma || res.test_200ma) && (std::uniform_int_distribution<>(1, 10)(gen) <= 1)) {
+                    trigger_alert = true;
+                    trigger_reason = std::string("Price testing ") + (res.test_50ma ? "50-day" : "200-day") + " MA boundary";
+                    tier = "opportunity";
+                }
 
-                    http_server->broadcast_alert(alert_json.dump());
+                if (trigger_alert) {
+                    auto opt_inst = store->get_instrument_by_symbol(res.symbol);
+                    if (opt_inst) {
+                        persistence::DbAlert a;
+                        a.ts = get_current_utc_timestamp();
+                        a.screen = "D";
+                        a.instrument_id = opt_inst->id;
+                        a.tier = tier;
+                        
+                        nlohmann::json payload;
+                        payload["symbol"] = res.symbol;
+                        payload["price"] = res.price;
+                        payload["trigger"] = trigger_reason;
+                        payload["ma50"] = res.ma50;
+                        payload["ma200"] = res.ma200;
+                        payload["dist_50ma"] = res.dist_50ma;
+                        payload["dist_200ma"] = res.dist_200ma;
+                        payload["rs_rank"] = res.rs_rank;
+                        
+                        a.payload_json = payload.dump();
+                        a.regime_at_alert = core::regime_to_string(regime);
+                        a.acted_on = 0;
+
+                        int64_t alert_id = store->add_alert(a);
+                        a.id = alert_id;
+
+                        nlohmann::json alert_json;
+                        alert_json["id"] = a.id;
+                        alert_json["ts"] = a.ts;
+                        alert_json["screen"] = a.screen;
+                        alert_json["instrument_id"] = a.instrument_id;
+                        alert_json["tier"] = a.tier;
+                        alert_json["payload"] = payload;
+                        alert_json["regime_at_alert"] = a.regime_at_alert;
+                        alert_json["acted_on"] = a.acted_on;
+
+                        http_server->broadcast_alert(alert_json.dump());
+                    }
                 }
             }
         }

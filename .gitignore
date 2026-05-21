@@ -22,6 +22,8 @@ scratch/
 
 # Environments
 .env
+config/secrets.env
+*.env
 
 # Token databases
 data/

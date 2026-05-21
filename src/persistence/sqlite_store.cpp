@@ -194,9 +194,52 @@ void SQLiteStore::init_schema() {
         "  status TEXT DEFAULT 'active',"
         "  FOREIGN KEY (instrument_id) REFERENCES instruments(id)"
         ");"
+        "CREATE TABLE IF NOT EXISTS positions ("
+        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  alert_id INTEGER NOT NULL,"
+        "  instrument_id INTEGER NOT NULL,"
+        "  direction TEXT,"
+        "  entry_ts TEXT NOT NULL,"
+        "  entry_price REAL NOT NULL,"
+        "  size REAL NOT NULL,"
+        "  initial_stop REAL,"
+        "  current_stop REAL,"
+        "  status TEXT,"
+        "  exit_ts TEXT,"
+        "  exit_price REAL,"
+        "  exit_reason TEXT,"
+        "  r_realized REAL,"
+        "  max_favorable_excursion_r REAL,"
+        "  max_adverse_excursion_r REAL,"
+        "  notes TEXT,"
+        "  FOREIGN KEY (alert_id) REFERENCES alerts(id),"
+        "  FOREIGN KEY (instrument_id) REFERENCES instruments(id)"
+        ");"
+        "CREATE TABLE IF NOT EXISTS parameter_changes ("
+        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  ts TEXT NOT NULL,"
+        "  screen TEXT NOT NULL,"
+        "  parameter TEXT NOT NULL,"
+        "  old_value TEXT,"
+        "  new_value TEXT,"
+        "  rationale TEXT,"
+        "  backtest_report_path TEXT"
+        ");"
+        "CREATE TABLE IF NOT EXISTS alert_responses ("
+        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  alert_id INTEGER NOT NULL,"
+        "  response_ts TEXT NOT NULL,"
+        "  response_type TEXT NOT NULL,"
+        "  skip_reason TEXT,"
+        "  note_text TEXT,"
+        "  FOREIGN KEY (alert_id) REFERENCES alerts(id)"
+        ");"
         "CREATE INDEX IF NOT EXISTS idx_alerts_ts ON alerts(ts);"
         "CREATE INDEX IF NOT EXISTS idx_alerts_screen ON alerts(screen);"
-        "CREATE INDEX IF NOT EXISTS idx_bars_daily_date ON bars_daily(date);";
+        "CREATE INDEX IF NOT EXISTS idx_bars_daily_date ON bars_daily(date);"
+        "CREATE INDEX IF NOT EXISTS idx_positions_alert ON positions(alert_id);"
+        "CREATE INDEX IF NOT EXISTS idx_positions_status ON positions(status);"
+        "CREATE INDEX IF NOT EXISTS idx_alert_responses_alert ON alert_responses(alert_id);";
 
     char* errMsg = nullptr;
     int rc = sqlite3_exec(pimpl_->db, sql, nullptr, nullptr, &errMsg);
@@ -612,5 +655,248 @@ void SQLiteStore::add_candidate_async(const DbCandidate& cand) {
     });
 }
 
+std::vector<DbBarDaily> SQLiteStore::get_bars_daily_range(int64_t instrument_id, const std::string& start_date, const std::string& end_date) {
+    std::lock_guard<std::mutex> lock(pimpl_->db_mutex);
+    std::vector<DbBarDaily> list;
+    const char* sql = "SELECT instrument_id, date, open, high, low, close, volume FROM bars_daily "
+                      "WHERE instrument_id = ? AND date >= ? AND date <= ? ORDER BY date ASC;";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(pimpl_->db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, instrument_id);
+        sqlite3_bind_text(stmt, 2, start_date.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 3, end_date.c_str(), -1, SQLITE_TRANSIENT);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            DbBarDaily bar;
+            bar.instrument_id = sqlite3_column_int64(stmt, 0);
+            bar.date = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+            bar.open = sqlite3_column_double(stmt, 2);
+            bar.high = sqlite3_column_double(stmt, 3);
+            bar.low = sqlite3_column_double(stmt, 4);
+            bar.close = sqlite3_column_double(stmt, 5);
+            bar.volume = sqlite3_column_double(stmt, 6);
+            list.push_back(bar);
+        }
+    }
+    sqlite3_finalize(stmt);
+    return list;
+}
+
+int64_t SQLiteStore::add_position(const DbPosition& pos) {
+    std::lock_guard<std::mutex> lock(pimpl_->db_mutex);
+    const char* sql = "INSERT INTO positions (alert_id, instrument_id, direction, entry_ts, entry_price, size, "
+                      "initial_stop, current_stop, status, exit_ts, exit_price, exit_reason, r_realized, "
+                      "max_favorable_excursion_r, max_adverse_excursion_r, notes) "
+                      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(pimpl_->db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        throw std::runtime_error(std::string("Prepare fail: ") + sqlite3_errmsg(pimpl_->db));
+    }
+    sqlite3_bind_int64(stmt, 1, pos.alert_id);
+    sqlite3_bind_int64(stmt, 2, pos.instrument_id);
+    sqlite3_bind_text(stmt, 3, pos.direction.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 4, pos.entry_ts.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_double(stmt, 5, pos.entry_price);
+    sqlite3_bind_double(stmt, 6, pos.size);
+    sqlite3_bind_double(stmt, 7, pos.initial_stop);
+    sqlite3_bind_double(stmt, 8, pos.current_stop);
+    sqlite3_bind_text(stmt, 9, pos.status.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 10, pos.exit_ts.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_double(stmt, 11, pos.exit_price);
+    sqlite3_bind_text(stmt, 12, pos.exit_reason.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_double(stmt, 13, pos.r_realized);
+    sqlite3_bind_double(stmt, 14, pos.max_favorable_excursion_r);
+    sqlite3_bind_double(stmt, 15, pos.max_adverse_excursion_r);
+    sqlite3_bind_text(stmt, 16, pos.notes.c_str(), -1, SQLITE_TRANSIENT);
+
+    int rc = sqlite3_step(stmt);
+    int64_t last_id = 0;
+    if (rc == SQLITE_DONE) {
+        last_id = sqlite3_last_insert_rowid(pimpl_->db);
+    }
+    sqlite3_finalize(stmt);
+    if (rc != SQLITE_DONE) {
+        throw std::runtime_error(std::string("Step fail: ") + sqlite3_errmsg(pimpl_->db));
+    }
+    return last_id;
+}
+
+void SQLiteStore::update_position(const DbPosition& pos) {
+    std::lock_guard<std::mutex> lock(pimpl_->db_mutex);
+    const char* sql = "UPDATE positions SET alert_id = ?, instrument_id = ?, direction = ?, entry_ts = ?, "
+                      "entry_price = ?, size = ?, initial_stop = ?, current_stop = ?, status = ?, exit_ts = ?, "
+                      "exit_price = ?, exit_reason = ?, r_realized = ?, max_favorable_excursion_r = ?, "
+                      "max_adverse_excursion_r = ?, notes = ? WHERE id = ?;";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(pimpl_->db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        throw std::runtime_error(std::string("Prepare fail: ") + sqlite3_errmsg(pimpl_->db));
+    }
+    sqlite3_bind_int64(stmt, 1, pos.alert_id);
+    sqlite3_bind_int64(stmt, 2, pos.instrument_id);
+    sqlite3_bind_text(stmt, 3, pos.direction.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 4, pos.entry_ts.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_double(stmt, 5, pos.entry_price);
+    sqlite3_bind_double(stmt, 6, pos.size);
+    sqlite3_bind_double(stmt, 7, pos.initial_stop);
+    sqlite3_bind_double(stmt, 8, pos.current_stop);
+    sqlite3_bind_text(stmt, 9, pos.status.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 10, pos.exit_ts.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_double(stmt, 11, pos.exit_price);
+    sqlite3_bind_text(stmt, 12, pos.exit_reason.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_double(stmt, 13, pos.r_realized);
+    sqlite3_bind_double(stmt, 14, pos.max_favorable_excursion_r);
+    sqlite3_bind_double(stmt, 15, pos.max_adverse_excursion_r);
+    sqlite3_bind_text(stmt, 16, pos.notes.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64(stmt, 17, pos.id);
+
+    int rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    if (rc != SQLITE_DONE) {
+        throw std::runtime_error(std::string("Step fail: ") + sqlite3_errmsg(pimpl_->db));
+    }
+}
+
+std::vector<DbPosition> SQLiteStore::get_positions() {
+    std::lock_guard<std::mutex> lock(pimpl_->db_mutex);
+    std::vector<DbPosition> list;
+    const char* sql = "SELECT id, alert_id, instrument_id, direction, entry_ts, entry_price, size, "
+                      "initial_stop, current_stop, status, exit_ts, exit_price, exit_reason, "
+                      "r_realized, max_favorable_excursion_r, max_adverse_excursion_r, notes FROM positions ORDER BY entry_ts DESC;";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(pimpl_->db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            DbPosition pos;
+            pos.id = sqlite3_column_int64(stmt, 0);
+            pos.alert_id = sqlite3_column_int64(stmt, 1);
+            pos.instrument_id = sqlite3_column_int64(stmt, 2);
+            pos.direction = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+            pos.entry_ts = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
+            pos.entry_price = sqlite3_column_double(stmt, 5);
+            pos.size = sqlite3_column_double(stmt, 6);
+            pos.initial_stop = sqlite3_column_double(stmt, 7);
+            pos.current_stop = sqlite3_column_double(stmt, 8);
+            pos.status = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 9));
+            const char* exit_ts = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 10));
+            pos.exit_ts = exit_ts ? exit_ts : "";
+            pos.exit_price = sqlite3_column_double(stmt, 11);
+            const char* exit_reason = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 12));
+            pos.exit_reason = exit_reason ? exit_reason : "";
+            pos.r_realized = sqlite3_column_double(stmt, 13);
+            pos.max_favorable_excursion_r = sqlite3_column_double(stmt, 14);
+            pos.max_adverse_excursion_r = sqlite3_column_double(stmt, 15);
+            const char* notes = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 16));
+            pos.notes = notes ? notes : "";
+            list.push_back(pos);
+        }
+    }
+    sqlite3_finalize(stmt);
+    return list;
+}
+
+int64_t SQLiteStore::add_parameter_change(const DbParameterChange& change) {
+    std::lock_guard<std::mutex> lock(pimpl_->db_mutex);
+    const char* sql = "INSERT INTO parameter_changes (ts, screen, parameter, old_value, new_value, rationale, backtest_report_path) "
+                      "VALUES (?, ?, ?, ?, ?, ?, ?);";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(pimpl_->db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        throw std::runtime_error(std::string("Prepare fail: ") + sqlite3_errmsg(pimpl_->db));
+    }
+    sqlite3_bind_text(stmt, 1, change.ts.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, change.screen.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, change.parameter.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 4, change.old_value.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 5, change.new_value.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 6, change.rationale.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 7, change.backtest_report_path.c_str(), -1, SQLITE_TRANSIENT);
+
+    int rc = sqlite3_step(stmt);
+    int64_t last_id = 0;
+    if (rc == SQLITE_DONE) {
+        last_id = sqlite3_last_insert_rowid(pimpl_->db);
+    }
+    sqlite3_finalize(stmt);
+    if (rc != SQLITE_DONE) {
+        throw std::runtime_error(std::string("Step fail: ") + sqlite3_errmsg(pimpl_->db));
+    }
+    return last_id;
+}
+
+std::vector<DbParameterChange> SQLiteStore::get_parameter_changes() {
+    std::lock_guard<std::mutex> lock(pimpl_->db_mutex);
+    std::vector<DbParameterChange> list;
+    const char* sql = "SELECT id, ts, screen, parameter, old_value, new_value, rationale, backtest_report_path FROM parameter_changes ORDER BY ts DESC;";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(pimpl_->db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            DbParameterChange change;
+            change.id = sqlite3_column_int64(stmt, 0);
+            change.ts = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+            change.screen = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
+            change.parameter = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+            const char* old_val = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
+            change.old_value = old_val ? old_val : "";
+            const char* new_val = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5));
+            change.new_value = new_val ? new_val : "";
+            const char* rat = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 6));
+            change.rationale = rat ? rat : "";
+            const char* path = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 7));
+            change.backtest_report_path = path ? path : "";
+            list.push_back(change);
+        }
+    }
+    sqlite3_finalize(stmt);
+    return list;
+}
+
+int64_t SQLiteStore::add_alert_response(const DbAlertResponse& resp) {
+    std::lock_guard<std::mutex> lock(pimpl_->db_mutex);
+    const char* sql = "INSERT INTO alert_responses (alert_id, response_ts, response_type, skip_reason, note_text) "
+                      "VALUES (?, ?, ?, ?, ?);";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(pimpl_->db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        throw std::runtime_error(std::string("Prepare fail: ") + sqlite3_errmsg(pimpl_->db));
+    }
+    sqlite3_bind_int64(stmt, 1, resp.alert_id);
+    sqlite3_bind_text(stmt, 2, resp.response_ts.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, resp.response_type.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 4, resp.skip_reason.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 5, resp.note_text.c_str(), -1, SQLITE_TRANSIENT);
+
+    int rc = sqlite3_step(stmt);
+    int64_t last_id = 0;
+    if (rc == SQLITE_DONE) {
+        last_id = sqlite3_last_insert_rowid(pimpl_->db);
+    }
+    sqlite3_finalize(stmt);
+    if (rc != SQLITE_DONE) {
+        throw std::runtime_error(std::string("Step fail: ") + sqlite3_errmsg(pimpl_->db));
+    }
+    return last_id;
+}
+
+std::vector<DbAlertResponse> SQLiteStore::get_alert_responses(int64_t alert_id) {
+    std::lock_guard<std::mutex> lock(pimpl_->db_mutex);
+    std::vector<DbAlertResponse> list;
+    const char* sql = "SELECT id, alert_id, response_ts, response_type, skip_reason, note_text FROM alert_responses WHERE alert_id = ? ORDER BY response_ts DESC;";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(pimpl_->db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, alert_id);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            DbAlertResponse resp;
+            resp.id = sqlite3_column_int64(stmt, 0);
+            resp.alert_id = sqlite3_column_int64(stmt, 1);
+            resp.response_ts = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
+            resp.response_type = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+            const char* skip = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
+            resp.skip_reason = skip ? skip : "";
+            const char* note = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5));
+            resp.note_text = note ? note : "";
+            list.push_back(resp);
+        }
+    }
+    sqlite3_finalize(stmt);
+    return list;
+}
+
 } // namespace persistence
 } // namespace trader
+

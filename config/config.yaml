@@ -1,0 +1,48 @@
+server:
+  http_port: 8080
+  ws_port: 8080 # same as http via Crow
+
+logging:
+  level: info
+  file: /var/log/trader-engine/engine.log
+  rotation_mb: 100
+
+database:
+  path: ./data/screener.db
+
+session:
+  prep_window: { open: "15:00", close: "16:30", tz: "Europe/Zurich" }
+  us_session: { open: "15:30", close: "22:00", tz: "Europe/Zurich" } # CEST
+  alerts_window: { open: "15:00", close: "22:30", tz: "Europe/Zurich" }
+  # Alerts outside this window are queued, not pushed
+
+telegram:
+  bot_token_env: TELEGRAM_BOT_TOKEN
+  chat_premium_env: TG_CHAT_PREMIUM
+  chat_opportunity_env: TG_CHAT_OPPORTUNITY
+  chat_digest_env: TG_CHAT_DIGEST
+  mode: long_polling # or "webhook"
+
+pushover:
+  enabled: false # toggle on once subscribed
+  app_token_env: PUSHOVER_APP_TOKEN
+  user_key_env: PUSHOVER_USER_KEY
+  premium_only: true
+
+sr_provider:
+  type: file_based # placeholder — switch to "external_process" or "linked" once Nuno's indicator is wired
+  external_process:
+    command: ["python3", "/opt/sr-indicator/run.py"]
+    protocol: stdio_json
+    cache_ttl_sec: 60
+  linked:
+    library_path: /opt/sr-indicator/libsr.so
+  file_based:
+    watch_dir: /var/lib/sr-indicator/output
+    file_pattern: "{symbol}.json"
+  fallback_to_algorithmic: true
+
+saxo:
+  base_url: https://gateway.saxobank.com/openapi
+  token_env: SAXO_TOKEN
+  refresh_token_env: SAXO_REFRESH_TOKEN

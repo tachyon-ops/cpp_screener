@@ -6,6 +6,15 @@
 #include "trader/broker/broker_adapter.hpp"
 
 namespace trader {
+
+namespace core {
+    class RegimeClassifier;
+}
+
+namespace screens {
+    class ScreenD;
+}
+
 namespace web {
 
 class HttpServer {
@@ -13,6 +22,8 @@ public:
     HttpServer(
         std::shared_ptr<persistence::SQLiteStore> store,
         std::shared_ptr<broker::BrokerAdapter> broker,
+        std::shared_ptr<core::RegimeClassifier> classifier,
+        std::shared_ptr<screens::ScreenD> screen_d,
         const std::string& public_dir = "./ui/dist",
         int port = 8080
     );

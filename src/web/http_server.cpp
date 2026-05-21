@@ -1,4 +1,6 @@
 #include "trader/web/http_server.hpp"
+#include "trader/core/regime_classifier.hpp"
+#include "trader/screens/screen_d.hpp"
 #include <crow.h>
 #include <nlohmann/json.hpp>
 #include <iostream>
@@ -14,6 +16,8 @@ namespace web {
 struct HttpServer::Impl {
     std::shared_ptr<persistence::SQLiteStore> store;
     std::shared_ptr<broker::BrokerAdapter> broker;
+    std::shared_ptr<core::RegimeClassifier> classifier;
+    std::shared_ptr<screens::ScreenD> screen_d;
     std::string public_dir;
     int port;
 
@@ -25,9 +29,11 @@ struct HttpServer::Impl {
     Impl(
         std::shared_ptr<persistence::SQLiteStore> s,
         std::shared_ptr<broker::BrokerAdapter> b,
+        std::shared_ptr<core::RegimeClassifier> c,
+        std::shared_ptr<screens::ScreenD> sd,
         std::string dir,
         int p
-    ) : store(std::move(s)), broker(std::move(b)), public_dir(std::move(dir)), port(p) {}
+    ) : store(std::move(s)), broker(std::move(b)), classifier(std::move(c)), screen_d(std::move(sd)), public_dir(std::move(dir)), port(p) {}
 
     void broadcast(const std::string& text) {
         std::lock_guard<std::mutex> lock(ws_mutex);
@@ -84,9 +90,11 @@ struct HttpServer::Impl {
 HttpServer::HttpServer(
     std::shared_ptr<persistence::SQLiteStore> store,
     std::shared_ptr<broker::BrokerAdapter> broker,
+    std::shared_ptr<core::RegimeClassifier> classifier,
+    std::shared_ptr<screens::ScreenD> screen_d,
     const std::string& public_dir,
     int port
-) : pimpl_(std::make_unique<Impl>(std::move(store), std::move(broker), public_dir, port)) {
+) : pimpl_(std::make_unique<Impl>(std::move(store), std::move(broker), std::move(classifier), std::move(screen_d), public_dir, port)) {
 
     // Define REST Endpoints
 
@@ -335,6 +343,118 @@ HttpServer::HttpServer(
             res["status"] = "success";
             res["symbol"] = inst.symbol;
             res["saxo_uic"] = inst.saxo_uic;
+            return crow::response(200, res.dump());
+        } catch (const std::exception& e) {
+            nlohmann::json err = {{"error", e.what()}};
+            return crow::response(500, err.dump());
+        }
+    });
+
+    // 7. GET /api/sector_rotation
+    CROW_ROUTE(pimpl_->app, "/api/sector_rotation")([this]() {
+        try {
+            if (!pimpl_->screen_d) {
+                nlohmann::json err = {{"error", "ScreenD component not registered."}};
+                return crow::response(500, err.dump());
+            }
+            auto results = pimpl_->screen_d->get_results();
+            nlohmann::json arr = nlohmann::json::array();
+            for (const auto& res : results) {
+                nlohmann::json obj;
+                obj["symbol"] = res.symbol;
+                obj["name"] = res.name;
+                obj["price"] = res.price;
+                obj["ma50"] = res.ma50;
+                obj["ma200"] = res.ma200;
+                obj["dist_50ma"] = res.dist_50ma;
+                obj["dist_200ma"] = res.dist_200ma;
+                obj["return_1m"] = res.return_1m;
+                obj["return_3m"] = res.return_3m;
+                obj["return_6m"] = res.return_6m;
+                obj["return_12m"] = res.return_12m;
+                obj["rs_rank"] = res.rs_rank;
+                obj["rs_percentile"] = res.rs_percentile;
+                obj["cross_50_200"] = res.cross_50_200;
+                obj["test_50ma"] = res.test_50ma;
+                obj["test_200ma"] = res.test_200ma;
+                arr.push_back(obj);
+            }
+            return crow::response(200, arr.dump());
+        } catch (const std::exception& e) {
+            nlohmann::json err = {{"error", e.what()}};
+            return crow::response(500, err.dump());
+        }
+    });
+
+    // 8. POST /api/recompute
+    CROW_ROUTE(pimpl_->app, "/api/recompute").methods(crow::HTTPMethod::POST)([this](const crow::request& req) {
+        try {
+            if (!pimpl_->classifier || !pimpl_->screen_d) {
+                nlohmann::json err = {{"error", "Classifier or ScreenD components not registered."}};
+                return crow::response(500, err.dump());
+            }
+
+            // Get current UTC date (YYYY-MM-DD)
+            auto now = std::chrono::system_clock::now();
+            auto time = std::chrono::system_clock::to_time_t(now);
+            std::stringstream ss;
+            ss << std::put_time(std::gmtime(&time), "%Y-%m-%d");
+            std::string date = ss.str();
+
+            double vix = 15.0;
+            double hy_oas = 3.5;
+            double breadth = 0.6;
+            double spx = 520.0; // Default SPY/SPX close
+
+            if (!req.body.empty()) {
+                try {
+                    auto body = nlohmann::json::parse(req.body);
+                    if (body.contains("date")) date = body["date"].get<std::string>();
+                    if (body.contains("vix")) vix = body["vix"].get<double>();
+                    if (body.contains("hy_oas")) hy_oas = body["hy_oas"].get<double>();
+                    if (body.contains("breadth")) breadth = body["breadth"].get<double>();
+                    if (body.contains("spx")) spx = body["spx"].get<double>();
+                } catch (...) {
+                    // Ignore parsing errors and use defaults
+                }
+            }
+
+            // Trigger evaluations
+            core::Regime new_regime = pimpl_->classifier->evaluate(date, vix, hy_oas, breadth, spx);
+            pimpl_->screen_d->evaluate(date);
+
+            // Fetch the updated log to broadcast
+            auto logs = pimpl_->store->get_regime_log(1);
+            nlohmann::json r_json;
+            if (!logs.empty()) {
+                const auto& log = logs[0];
+                r_json["ts"] = log.ts;
+                r_json["regime"] = log.regime;
+                r_json["vix"] = log.vix;
+                r_json["breadth"] = log.breadth;
+                r_json["hy_oas"] = log.hy_oas;
+                r_json["spx_vs_200ma"] = log.spx_vs_200ma;
+                try {
+                    r_json["detail"] = nlohmann::json::parse(log.detail_json);
+                } catch (...) {
+                    r_json["detail"] = log.detail_json;
+                }
+            } else {
+                r_json["ts"] = date + "T16:30:00Z";
+                r_json["regime"] = core::regime_to_string(new_regime);
+                r_json["vix"] = vix;
+                r_json["breadth"] = breadth;
+                r_json["hy_oas"] = hy_oas;
+                r_json["spx_vs_200ma"] = 0.0;
+                r_json["detail"] = nlohmann::json::object();
+            }
+
+            broadcast_regime(r_json.dump());
+
+            nlohmann::json res;
+            res["status"] = "success";
+            res["date"] = date;
+            res["regime"] = core::regime_to_string(new_regime);
             return crow::response(200, res.dump());
         } catch (const std::exception& e) {
             nlohmann::json err = {{"error", e.what()}};

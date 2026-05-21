@@ -46,13 +46,13 @@ cpp_screener/
 | Kind of thing | Where it lives | Naming convention |
 |---|---|---|
 | Domain entities and types | `include/trader/core/` | `snake_case.hpp` |
-| Pure business logic | `src/core/` [Planned] | `snake_case.cpp` |
+| Pure business logic | `src/core/` | `snake_case.cpp` |
 | Ports (interfaces for I/O) | `include/trader/broker/` | `abstract_interface.hpp` |
 | Adapters (Port implementations) | `src/broker/` | `snake_case.cpp` |
 | HTTP / API endpoints / Web Server | `src/web/` / `include/trader/web/` | `snake_case.cpp` / `snake_case.hpp` |
 | Token / Credentials Storage | `src/storage/` / `include/trader/storage/` | `snake_case.cpp` / `snake_case.hpp` |
-| Screen logic | `src/screens/` [Planned] | `screen_id_name.cpp` |
-| Regime classification | `src/regime/` [Planned] | `snake_case.cpp` |
+| Screen logic | `src/screens/` | `screen_id_name.cpp` |
+| Regime classification | `src/core/` | `snake_case.cpp` |
 | Database store / schemas | `src/persistence/` / `include/trader/persistence/` | `snake_case.cpp` / `snake_case.hpp` |
 | Database Files | `data/` | `*.db` |
 | Configuration | Configured via DB seeds / environment variables | N/A |
@@ -122,6 +122,7 @@ Automated tests (GoogleTest) are planned under a virtual `tests/` directory but 
 ## Key Documents to Read
 
 1. This file (`codebase-map`)
-2. [SPECS_v2.0.md](file:///Users/nunoribeiro/repos/cpp_screener/SPECS_v2.0.md) — The current architectural blueprint and specification
-3. [SPECS_v1.0.md](file:///Users/nunoribeiro/repos/cpp_screener/SPECS_v1.0.md) — The foundational blueprint
-4. Other library skills relevant to the task (`architecture`, `api-design`, `prisma-ui`)
+2. [SPECS_v3.9.md](file:///Users/nunoribeiro/repos/cpp_screener/SPECS_v3.9.md) — The active architectural blueprint and specification (v3.9)
+3. [SPECS_v2.0.md](file:///Users/nunoribeiro/repos/cpp_screener/SPECS_v2.0.md) — The previous v2.0 architectural spec
+4. [SPECS_v1.0.md](file:///Users/nunoribeiro/repos/cpp_screener/SPECS_v1.0.md) — The foundational blueprint
+5. Other library skills relevant to the task (`architecture`, `api-design`, `prisma-ui`)

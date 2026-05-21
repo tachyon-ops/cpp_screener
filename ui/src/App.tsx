@@ -49,8 +49,27 @@ interface Candidate {
   status: string;
 }
 
+interface RotationResult {
+  symbol: string;
+  name: string;
+  price: number;
+  ma50: number;
+  ma200: number;
+  dist_50ma: number;
+  dist_200ma: number;
+  return_1m: number;
+  return_3m: number;
+  return_6m: number;
+  return_12m: number;
+  rs_rank: number;
+  rs_percentile: number;
+  cross_50_200: boolean;
+  test_50ma: boolean;
+  test_200ma: boolean;
+}
+
 function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'alerts' | 'candidates' | 'universe'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'alerts' | 'candidates' | 'universe' | 'rotation'>('dashboard');
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [instruments, setInstruments] = useState<Instrument[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -58,6 +77,14 @@ function App() {
   const [regime, setRegime] = useState<Regime | null>(null);
   const [ticks, setTicks] = useState<Record<string, number>>({});
   
+  // Sector Rotation State
+  const [rotationData, setRotationData] = useState<RotationResult[]>([]);
+  const [loadingRotation, setLoadingRotation] = useState<boolean>(false);
+  const [rotationSortField, setRotationSortField] = useState<keyof RotationResult>('rs_rank');
+  const [rotationSortAsc, setRotationSortAsc] = useState<boolean>(true);
+  const [rotationFilter, setRotationFilter] = useState<string>('');
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+
   // Forms & Interactive State
   const [symbolSearch, setSymbolSearch] = useState<string>('');
   const [onboardAssetClass, setOnboardAssetClass] = useState<string>('Stock');
@@ -79,11 +106,13 @@ function App() {
   // Fetch initial data
   const fetchData = async () => {
     try {
-      const [resRegime, resAlerts, resCandidates, resInstruments] = await Promise.all([
+      setLoadingRotation(true);
+      const [resRegime, resAlerts, resCandidates, resInstruments, resRotation] = await Promise.all([
         fetch('/api/regime'),
         fetch('/api/alerts'),
         fetch('/api/candidates'),
-        fetch('/api/instruments')
+        fetch('/api/instruments'),
+        fetch('/api/sector_rotation')
       ]);
 
       if (resRegime.ok) {
@@ -93,9 +122,12 @@ function App() {
       if (resAlerts.ok) setAlerts(await resAlerts.json());
       if (resCandidates.ok) setCandidates(await resCandidates.json());
       if (resInstruments.ok) setInstruments(await resInstruments.json());
+      if (resRotation.ok) setRotationData(await resRotation.json());
     } catch (e) {
       console.error('Failed to fetch screener data:', e);
       showToast('Error syncing with engine. Retrying...', 'error');
+    } finally {
+      setLoadingRotation(false);
     }
   };
 
@@ -252,6 +284,66 @@ function App() {
     }
   };
 
+  // Sector Rotation Handlers
+  const handleRecomputeRotation = async () => {
+    try {
+      showToast('Recomputing market regime & sector rotation board...', 'info');
+      setLoadingRotation(true);
+      const response = await fetch('/api/recompute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      const data = await response.json();
+      if (response.ok) {
+        showToast('Recomputation completed successfully!', 'success');
+        fetchData();
+      } else {
+        showToast(data.error || 'Failed to recompute', 'error');
+        setLoadingRotation(false);
+      }
+    } catch (e) {
+      showToast('Network error triggering recomputation', 'error');
+      setLoadingRotation(false);
+    }
+  };
+
+  const getPerformanceColor = (ret: number) => {
+    if (ret >= 0.25) return 'border-emerald-500/40 text-emerald-400 bg-emerald-950/20 shadow-[0_0_12px_rgba(16,185,129,0.1)]';
+    if (ret >= 0.10) return 'border-emerald-500/20 text-emerald-300 bg-emerald-950/10';
+    if (ret > -0.10) return 'border-white/5 text-gray-300 bg-white/5';
+    if (ret > -0.25) return 'border-rose-500/25 text-rose-300 bg-rose-950/10';
+    return 'border-rose-500/40 text-rose-400 bg-rose-950/20 shadow-[0_0_12px_rgba(244,63,94,0.1)]';
+  };
+
+  const handleSort = (field: keyof RotationResult) => {
+    if (rotationSortField === field) {
+      setRotationSortAsc(!rotationSortAsc);
+    } else {
+      setRotationSortField(field);
+      setRotationSortAsc(false); // default descending for sorting new fields
+    }
+  };
+
+  const renderTableHeader = (field: keyof RotationResult, label: string) => {
+    const isSorted = rotationSortField === field;
+    return (
+      <th 
+        className="p-4 cursor-pointer hover:bg-white/5 select-none transition"
+        onClick={() => handleSort(field)}
+      >
+        <div className="flex items-center gap-1">
+          <span>{label}</span>
+          {isSorted && (
+            <span className="text-[10px] text-[#ff6d5a]">
+              {rotationSortAsc ? '▲' : '▼'}
+            </span>
+          )}
+        </div>
+      </th>
+    );
+  };
+
   const getRegimeColor = (state: string) => {
     switch (state?.toLowerCase()) {
       case 'bull': return 'border-emerald-500/30 text-emerald-400 bg-emerald-500/5 glow-emerald';
@@ -261,6 +353,28 @@ function App() {
       default: return 'border-gray-500/30 text-gray-400 bg-gray-500/5';
     }
   };
+
+  const sortedRotation = [...rotationData]
+    .filter(item => {
+      const s = rotationFilter.toLowerCase();
+      return item.symbol.toLowerCase().includes(s) || item.name.toLowerCase().includes(s);
+    })
+    .sort((a, b) => {
+      const aVal = a[rotationSortField];
+      const bVal = b[rotationSortField];
+      
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        const comp = aVal.localeCompare(bVal);
+        return rotationSortAsc ? comp : -comp;
+      }
+      
+      const aNum = typeof aVal === 'boolean' ? (aVal ? 1 : 0) : (aVal as number);
+      const bNum = typeof bVal === 'boolean' ? (bVal ? 1 : 0) : (bVal as number);
+      
+      if (aNum < bNum) return rotationSortAsc ? -1 : 1;
+      if (aNum > bNum) return rotationSortAsc ? 1 : -1;
+      return 0;
+    });
 
   return (
     <div className="min-h-screen bg-[#0b0c10] text-[#e0e1e6] flex flex-col font-sans select-none antialiased">
@@ -290,19 +404,28 @@ function App() {
 
         {/* Navigation Tabs */}
         <nav className="flex gap-1 bg-black/40 p-1 rounded-lg border border-white/5">
-          {(['dashboard', 'alerts', 'candidates', 'universe'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-md text-xs font-semibold uppercase tracking-wider transition-all duration-200 ${
-                activeTab === tab 
-                  ? 'bg-gradient-to-r from-[#ff6d5a] to-[#ff8c7a] text-black shadow-md font-bold' 
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
+          {(['dashboard', 'alerts', 'candidates', 'universe', 'rotation'] as const).map((tab) => {
+            const labels: Record<string, string> = {
+              dashboard: 'Dashboard',
+              alerts: 'Alerts',
+              candidates: 'Candidates',
+              universe: 'Universe',
+              rotation: 'Sector Heatmap'
+            };
+            return (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2 rounded-md text-xs font-semibold uppercase tracking-wider transition-all duration-200 ${
+                  activeTab === tab 
+                    ? 'bg-gradient-to-r from-[#ff6d5a] to-[#ff8c7a] text-black shadow-md font-bold' 
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                {labels[tab]}
+              </button>
+            );
+          })}
         </nav>
 
         {/* Engine Status */}
@@ -806,6 +929,294 @@ function App() {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* Sector Rotation Tab */}
+        {activeTab === 'rotation' && (
+          <div className="space-y-6 animate-fade-in">
+            {/* Page Title & Intro */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-white">Sector & Industry Rotation Heatmap</h2>
+                <p className="text-xs text-gray-400 mt-1">
+                  Relative Strength ranking and momentum metrics for major sector and industry ETFs.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={fetchData}
+                  disabled={loadingRotation}
+                  className="bg-white/5 hover:bg-white/10 text-white border border-white/10 text-xs font-semibold rounded-lg px-4 py-2 transition flex items-center gap-1 disabled:opacity-50"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.253 8H18" />
+                  </svg>
+                  Refresh Data
+                </button>
+                <button
+                  onClick={handleRecomputeRotation}
+                  disabled={loadingRotation}
+                  className="bg-[#ff6d5a] hover:bg-[#ff8c7a] text-black text-xs font-bold rounded-lg px-4 py-2 transition flex items-center gap-1 disabled:opacity-50"
+                >
+                  {loadingRotation ? (
+                    <span className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin"></span>
+                  ) : (
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                  )}
+                  Recompute EOD
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Summary Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="glass border border-white/5 p-4 rounded-xl">
+                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Total ETFs</div>
+                <div className="text-2xl font-bold text-white mt-1 font-mono">{rotationData.length}</div>
+                <div className="text-[9px] text-gray-500 mt-0.5">Actively tracked sectors</div>
+              </div>
+              <div className="glass border border-white/5 p-4 rounded-xl">
+                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Bullish Regime</div>
+                <div className="text-2xl font-bold text-emerald-400 mt-1 font-mono">
+                  {rotationData.filter(d => d.return_12m > 0).length}
+                </div>
+                <div className="text-[9px] text-gray-500 mt-0.5">12M return is positive</div>
+              </div>
+              <div className="glass border border-white/5 p-4 rounded-xl">
+                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Crossovers (5d)</div>
+                <div className="text-2xl font-bold text-purple-400 mt-1 font-mono">
+                  {rotationData.filter(d => d.cross_50_200).length}
+                </div>
+                <div className="text-[9px] text-gray-500 mt-0.5">Active Golden/Death crosses</div>
+              </div>
+              <div className="glass border border-white/5 p-4 rounded-xl">
+                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Boundary Tests</div>
+                <div className="text-2xl font-bold text-cyan-400 mt-1 font-mono">
+                  {rotationData.filter(d => d.test_50ma || d.test_200ma).length}
+                </div>
+                <div className="text-[9px] text-gray-500 mt-0.5">Price within 1% of MA</div>
+              </div>
+            </div>
+
+            {/* Controls Bar */}
+            <div className="flex flex-col sm:flex-row gap-3 justify-between items-center bg-black/35 p-3 rounded-xl border border-white/5">
+              {/* Search */}
+              <div className="relative w-full sm:w-80">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500 text-xs">
+                  🔍
+                </span>
+                <input
+                  type="text"
+                  placeholder="Filter by symbol or sector..."
+                  value={rotationFilter}
+                  onChange={(e) => setRotationFilter(e.target.value)}
+                  className="w-full bg-black/40 border border-white/10 rounded-lg pl-9 pr-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-white/20 transition font-sans"
+                />
+              </div>
+
+              {/* View Toggle */}
+              <div className="flex bg-black/50 p-0.5 rounded-lg border border-white/10 w-full sm:w-auto">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-[10px] uppercase font-bold tracking-wider transition ${
+                    viewMode === 'grid'
+                      ? 'bg-white/10 text-white shadow-sm'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Grid Heatmap
+                </button>
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-[10px] uppercase font-bold tracking-wider transition ${
+                    viewMode === 'table'
+                      ? 'bg-white/10 text-white shadow-sm'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Details Table
+                </button>
+              </div>
+            </div>
+
+            {/* Loading Indicator */}
+            {loadingRotation && rotationData.length === 0 ? (
+              <div className="flex flex-col items-center justify-center p-12 space-y-4">
+                <span className="w-8 h-8 border-4 border-[#ff6d5a] border-t-transparent rounded-full animate-spin"></span>
+                <span className="text-xs text-gray-400">Loading sector rotation board...</span>
+              </div>
+            ) : sortedRotation.length === 0 ? (
+              <div className="text-center py-12 text-gray-500 border border-dashed border-white/10 rounded-xl">
+                No sector ETFs found matching search criteria.
+              </div>
+            ) : viewMode === 'grid' ? (
+              /* Heatmap Grid View */
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {sortedRotation.map((item) => {
+                  const price = ticks[item.symbol] || item.price;
+                  return (
+                    <div
+                      key={item.symbol}
+                      className={`glass border p-4 rounded-xl flex flex-col justify-between transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg ${getPerformanceColor(item.return_12m)}`}
+                    >
+                      <div>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="text-[10px] opacity-60 font-bold font-mono">#{item.rs_rank}</span>
+                            <h3 className="text-lg font-bold tracking-tight text-white font-mono leading-tight">{item.symbol}</h3>
+                          </div>
+                          <span className="text-xs font-bold font-mono text-white/95">
+                            ${price.toFixed(2)}
+                          </span>
+                        </div>
+                        <p className="text-[10px] opacity-75 mt-1 truncate font-sans font-medium" title={item.name}>
+                          {item.name}
+                        </p>
+                      </div>
+
+                      {/* Performance Indicators */}
+                      <div className="mt-4 grid grid-cols-2 gap-x-2 gap-y-1.5 border-t border-white/5 pt-3 font-mono text-[10px]">
+                        <div className="flex justify-between">
+                          <span className="opacity-50">1M:</span>
+                          <span className={item.return_1m >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                            {item.return_1m >= 0 ? '+' : ''}{(item.return_1m * 100).toFixed(2)}%
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="opacity-50">3M:</span>
+                          <span className={item.return_3m >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                            {item.return_3m >= 0 ? '+' : ''}{(item.return_3m * 100).toFixed(2)}%
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="opacity-50">6M:</span>
+                          <span className={item.return_6m >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                            {item.return_6m >= 0 ? '+' : ''}{(item.return_6m * 100).toFixed(2)}%
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="opacity-50">12M:</span>
+                          <span className={item.return_12m >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                            {item.return_12m >= 0 ? '+' : ''}{(item.return_12m * 100).toFixed(2)}%
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* MA Distances & Badges */}
+                      <div className="mt-3 border-t border-white/5 pt-3 space-y-2">
+                        <div className="flex justify-between text-[9px] font-mono">
+                          <div className="flex flex-col">
+                            <span className="opacity-50">Dist 50MA</span>
+                            <span className={`font-semibold ${item.dist_50ma >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              {item.dist_50ma >= 0 ? '+' : ''}{(item.dist_50ma * 100).toFixed(1)}%
+                            </span>
+                          </div>
+                          <div className="flex flex-col items-end">
+                            <span className="opacity-50">Dist 200MA</span>
+                            <span className={`font-semibold ${item.dist_200ma >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              {item.dist_200ma >= 0 ? '+' : ''}{(item.dist_200ma * 100).toFixed(1)}%
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Event Badges */}
+                        <div className="flex flex-wrap gap-1">
+                          {item.cross_50_200 && (
+                            <span className="px-1.5 py-0.5 rounded text-[8px] uppercase font-bold bg-purple-500/20 text-purple-300 border border-purple-500/20 animate-pulse">
+                              MA Crossover
+                            </span>
+                          )}
+                          {item.test_50ma && (
+                            <span className="px-1.5 py-0.5 rounded text-[8px] uppercase font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/20">
+                              Test 50MA
+                            </span>
+                          )}
+                          {item.test_200ma && (
+                            <span className="px-1.5 py-0.5 rounded text-[8px] uppercase font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/20">
+                              Test 200MA
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* Table View */
+              <div className="glass border border-white/5 rounded-xl overflow-hidden">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-white/5 bg-white/5 text-gray-400 font-bold uppercase tracking-wider">
+                      {renderTableHeader('rs_rank', 'Rank')}
+                      {renderTableHeader('symbol', 'Symbol')}
+                      {renderTableHeader('name', 'Name')}
+                      {renderTableHeader('price', 'Price')}
+                      {renderTableHeader('return_1m', '1M')}
+                      {renderTableHeader('return_3m', '3M')}
+                      {renderTableHeader('return_6m', '6M')}
+                      {renderTableHeader('return_12m', '12M')}
+                      {renderTableHeader('dist_50ma', 'd/50MA')}
+                      {renderTableHeader('dist_200ma', 'd/200MA')}
+                      <th className="p-4">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 font-mono text-gray-300">
+                    {sortedRotation.map((item) => {
+                      const price = ticks[item.symbol] || item.price;
+                      return (
+                        <tr key={item.symbol} className="hover:bg-white/5 transition">
+                          <td className="p-4 font-bold text-white">#{item.rs_rank}</td>
+                          <td className="p-4 font-bold text-white text-sm">{item.symbol}</td>
+                          <td className="p-4 text-gray-400 font-sans font-medium">{item.name}</td>
+                          <td className="p-4 font-bold text-white">${price.toFixed(2)}</td>
+                          <td className={`p-4 ${item.return_1m >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {item.return_1m >= 0 ? '+' : ''}{(item.return_1m * 100).toFixed(2)}%
+                          </td>
+                          <td className={`p-4 ${item.return_3m >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {item.return_3m >= 0 ? '+' : ''}{(item.return_3m * 100).toFixed(2)}%
+                          </td>
+                          <td className={`p-4 ${item.return_6m >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {item.return_6m >= 0 ? '+' : ''}{(item.return_6m * 100).toFixed(2)}%
+                          </td>
+                          <td className={`p-4 ${item.return_12m >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {item.return_12m >= 0 ? '+' : ''}{(item.return_12m * 100).toFixed(2)}%
+                          </td>
+                          <td className={`p-4 ${item.dist_50ma >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {item.dist_50ma >= 0 ? '+' : ''}{(item.dist_50ma * 100).toFixed(1)}%
+                          </td>
+                          <td className={`p-4 ${item.dist_200ma >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {item.dist_200ma >= 0 ? '+' : ''}{(item.dist_200ma * 100).toFixed(1)}%
+                          </td>
+                          <td className="p-4">
+                            <div className="flex gap-1">
+                              {item.cross_50_200 && (
+                                <span className="px-1.5 py-0.5 rounded text-[8px] uppercase font-bold bg-purple-500/20 text-purple-300">
+                                  Cross
+                                </span>
+                              )}
+                              {item.test_50ma && (
+                                <span className="px-1.5 py-0.5 rounded text-[8px] uppercase font-bold bg-cyan-500/20 text-cyan-300">
+                                  T/50
+                                </span>
+                              )}
+                              {item.test_200ma && (
+                                <span className="px-1.5 py-0.5 rounded text-[8px] uppercase font-bold bg-indigo-500/20 text-indigo-300">
+                                  T/200
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </main>

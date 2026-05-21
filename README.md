@@ -111,7 +111,31 @@ Ensure the databases exist inside the `data/` directory:
 - **Screener Store**: `./data/screener.db`
 - **Token Store**: `./data/tokens.db`
 
-### 2. Launch the Engine Manually
+### 2. Telegram Bot Configuration
+The engine supports broadcasting alerts to Telegram channels. To activate the Telegram bot (`t.me/falling_knives_bot`):
+1. **Chat Channels Setup**: Create three Telegram channels or groups:
+   - `Premium` alerts (interrupt-worthy)
+   - `Opportunity` alerts (interesting screen setups)
+   - `Digest` alerts (EOD digests and logs)
+2. **Admin Access**: Add the bot to these channels/groups and grant it administrator permissions (to send messages).
+3. **Environment Setup**: Add your API tokens and chat IDs to your environment or create a `.env` file (or `config/secrets.env`):
+   ```env
+   TELEGRAM_BOT_TOKEN=8859988952:AAFkaAh9tyyTxuw5Rezqeab7Pnko67D3m24
+   TG_CHAT_PREMIUM=<your_premium_chat_id>
+   TG_CHAT_OPPORTUNITY=<your_opportunity_chat_id>
+   TG_CHAT_DIGEST=<your_digest_chat_id>
+   ```
+4. **Configuration Mapping**: The mapping from environment variables to the engine is defined in `config/config.yaml`:
+   ```yaml
+   telegram:
+     bot_token_env: TELEGRAM_BOT_TOKEN
+     chat_premium_env: TG_CHAT_PREMIUM
+     chat_opportunity_env: TG_CHAT_OPPORTUNITY
+     chat_digest_env: TG_CHAT_DIGEST
+     mode: long_polling # or "webhook"
+   ```
+
+### 3. Launch the Engine Manually
 ```bash
 ./build/trader_engine
 ```

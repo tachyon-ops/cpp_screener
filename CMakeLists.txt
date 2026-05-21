@@ -80,6 +80,8 @@ set(SOURCE_FILES
     src/storage/token_store.cpp
     src/persistence/sqlite_store.cpp
     src/web/http_server.cpp
+    src/core/regime_classifier.cpp
+    src/screens/screen_d.cpp
 )
 
 # Executable target
