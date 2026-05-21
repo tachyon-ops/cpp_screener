@@ -26,3 +26,5 @@ scratch/
 # Token databases
 data/
 *.db
+
+node_modules/
