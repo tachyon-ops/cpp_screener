@@ -190,6 +190,11 @@ void AlertDispatcher::dispatch(const Alert& alert) {
     queue_cv_.notify_one();
 }
 
+void AlertDispatcher::set_alert_callback(std::function<void(const std::string&)> cb) {
+    std::lock_guard<std::mutex> lock(cb_mutex_);
+    alert_cb_ = cb;
+}
+
 void AlertDispatcher::calculate_position_sizes(Alert& alert) {
     double equity = 1000000.0; // Fallback 1M
     auto acc_res = broker_->get_account();
@@ -371,7 +376,22 @@ void AlertDispatcher::process_queued_alerts(std::vector<Alert>& alerts) {
                 payload["price"] = alert.suggested_entry_high;
                 payload["trigger"] = "Consolidation (demoted due to cluster cooldown)";
                 db_a.payload_json = payload.dump();
-                store_->add_alert(db_a);
+                int64_t db_id = store_->add_alert(db_a);
+                {
+                    std::lock_guard<std::mutex> cb_lock(cb_mutex_);
+                    if (alert_cb_) {
+                        nlohmann::json obj;
+                        obj["id"] = db_id;
+                        obj["ts"] = db_a.ts;
+                        obj["screen"] = db_a.screen;
+                        obj["instrument_id"] = db_a.instrument_id;
+                        obj["tier"] = db_a.tier;
+                        obj["regime_at_alert"] = db_a.regime_at_alert;
+                        obj["acted_on"] = 0;
+                        obj["payload"] = payload;
+                        alert_cb_(obj.dump());
+                    }
+                }
             }
             continue;
         }
@@ -461,6 +481,21 @@ void AlertDispatcher::process_queued_alerts(std::vector<Alert>& alerts) {
             db_leader.payload_json = payload.dump();
             int64_t leader_id = store_->add_alert(db_leader);
             leader.id = leader_id;
+            {
+                std::lock_guard<std::mutex> cb_lock(cb_mutex_);
+                if (alert_cb_) {
+                    nlohmann::json obj;
+                    obj["id"] = leader_id;
+                    obj["ts"] = db_leader.ts;
+                    obj["screen"] = db_leader.screen;
+                    obj["instrument_id"] = db_leader.instrument_id;
+                    obj["tier"] = db_leader.tier;
+                    obj["regime_at_alert"] = db_leader.regime_at_alert;
+                    obj["acted_on"] = 0;
+                    obj["payload"] = payload;
+                    alert_cb_(obj.dump());
+                }
+            }
 
             // Generate dynamic inline buttons
             nlohmann::json inline_kb = {
@@ -493,7 +528,22 @@ void AlertDispatcher::process_queued_alerts(std::vector<Alert>& alerts) {
                     p["price"] = alert.suggested_entry_high;
                     p["trigger"] = "Demoted cluster member of " + cluster_id + " (leader: " + leader.symbol + ")";
                     db_member.payload_json = p.dump();
-                    store_->add_alert(db_member);
+                    int64_t db_id = store_->add_alert(db_member);
+                    {
+                        std::lock_guard<std::mutex> cb_lock(cb_mutex_);
+                        if (alert_cb_) {
+                            nlohmann::json obj;
+                            obj["id"] = db_id;
+                            obj["ts"] = db_member.ts;
+                            obj["screen"] = db_member.screen;
+                            obj["instrument_id"] = db_member.instrument_id;
+                            obj["tier"] = db_member.tier;
+                            obj["regime_at_alert"] = db_member.regime_at_alert;
+                            obj["acted_on"] = 0;
+                            obj["payload"] = p;
+                            alert_cb_(obj.dump());
+                        }
+                    }
                 }
             }
         } else {
@@ -545,6 +595,21 @@ void AlertDispatcher::process_queued_alerts(std::vector<Alert>& alerts) {
         
         int64_t db_id = store_->add_alert(db_a);
         alert.id = db_id;
+        {
+            std::lock_guard<std::mutex> cb_lock(cb_mutex_);
+            if (alert_cb_) {
+                nlohmann::json obj;
+                obj["id"] = db_id;
+                obj["ts"] = db_a.ts;
+                obj["screen"] = db_a.screen;
+                obj["instrument_id"] = db_a.instrument_id;
+                obj["tier"] = db_a.tier;
+                obj["regime_at_alert"] = db_a.regime_at_alert;
+                obj["acted_on"] = 0;
+                obj["payload"] = payload;
+                alert_cb_(obj.dump());
+            }
+        }
 
         // If interesting, save only (no push)
         if (alert.tier == "interesting") {

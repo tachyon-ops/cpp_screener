@@ -1,4 +1,5 @@
 #include "trader/screens/screen_b.hpp"
+#include "trader/core/alert_dispatcher.hpp"
 #include <iostream>
 #include <cmath>
 #include <algorithm>
@@ -96,8 +97,10 @@ double calculate_rsi14(const std::vector<persistence::DbBarDaily>& bars) {
 }
 } // namespace
 
-ScreenB::ScreenB(std::shared_ptr<persistence::SQLiteStore> store)
-    : store_(store) {}
+ScreenB::ScreenB(
+    std::shared_ptr<persistence::SQLiteStore> store,
+    std::shared_ptr<core::AlertDispatcher> dispatcher
+) : store_(store), dispatcher_(dispatcher) {}
 
 void ScreenB::evaluate(const std::string& date) {
     std::cout << "[ScreenB] Running Swing Pullback calculations for date: " << date << std::endl;
@@ -463,6 +466,44 @@ void ScreenB::evaluate(const std::string& date) {
                 store_->add_candidate(c);
                 std::cout << "[ScreenB] Registered new " << results[i].setup_tier 
                           << " pullback candidate for " << results[i].symbol << std::endl;
+
+                if (dispatcher_) {
+                    core::Alert alert;
+                    alert.ts = c.created_ts;
+                    alert.screen = "B";
+                    alert.tier = results[i].setup_tier;
+                    alert.instrument_id = opt_stock->id;
+                    alert.symbol = results[i].symbol;
+                    
+                    std::string regime_str = "Chop";
+                    auto logs = store_->get_regime_log(1);
+                    if (!logs.empty()) {
+                        regime_str = logs[0].regime;
+                    }
+                    alert.regime_at_alert = regime_str;
+
+                    alert.suggested_entry_low = results[i].entry_zone_low;
+                    alert.suggested_entry_high = results[i].entry_zone_high;
+                    alert.suggested_stop = results[i].suggested_stop;
+                    alert.target_1 = results[i].entry_zone_high + results[i].rr_target * (results[i].entry_zone_high - results[i].suggested_stop);
+                    alert.target_2 = results[i].entry_zone_high + 2.0 * results[i].rr_target * (results[i].entry_zone_high - results[i].suggested_stop);
+                    alert.target_3 = results[i].entry_zone_high + 3.0 * results[i].rr_target * (results[i].entry_zone_high - results[i].suggested_stop);
+                    alert.rr_to_target_1 = results[i].rr_target;
+
+                    // Add confluence factors
+                    alert.confluence_factors.push_back("RSI: " + std::to_string((int)results[i].rsi14));
+                    alert.confluence_factors.push_back("Vol Contraction");
+                    if (results[i].notes.find("20-day MA") != std::string::npos) {
+                        alert.confluence_factors.push_back("20MA support");
+                    } else {
+                        alert.confluence_factors.push_back("Prior high support");
+                    }
+
+                    // Set conviction score
+                    alert.conviction_score = results[i].rr_target;
+
+                    dispatcher_->dispatch(alert);
+                }
             }
         }
     }

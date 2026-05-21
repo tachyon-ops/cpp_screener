@@ -6,6 +6,10 @@
 #include <string>
 
 namespace trader {
+namespace core {
+    class AlertDispatcher;
+}
+
 namespace screens {
 
 struct ScreenBResult {
@@ -32,7 +36,10 @@ struct ScreenBResult {
 
 class ScreenB : public Screen {
 public:
-    explicit ScreenB(std::shared_ptr<persistence::SQLiteStore> store);
+    ScreenB(
+        std::shared_ptr<persistence::SQLiteStore> store,
+        std::shared_ptr<core::AlertDispatcher> dispatcher = nullptr
+    );
     ~ScreenB() override = default;
 
     std::string name() const override { return "ScreenB"; }
@@ -45,6 +52,7 @@ public:
 
 private:
     std::shared_ptr<persistence::SQLiteStore> store_;
+    std::shared_ptr<core::AlertDispatcher> dispatcher_;
     mutable std::mutex results_mutex_;
     std::vector<ScreenBResult> latest_results_;
 };

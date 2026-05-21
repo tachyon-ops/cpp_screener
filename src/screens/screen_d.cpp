@@ -1,4 +1,5 @@
 #include "trader/screens/screen_d.hpp"
+#include "trader/core/alert_dispatcher.hpp"
 #include <iostream>
 #include <cmath>
 #include <algorithm>
@@ -64,8 +65,10 @@ std::vector<std::string> get_trading_days_back(const std::string& start_date, in
 }
 } // namespace
 
-ScreenD::ScreenD(std::shared_ptr<persistence::SQLiteStore> store)
-    : store_(store) {}
+ScreenD::ScreenD(
+    std::shared_ptr<persistence::SQLiteStore> store,
+    std::shared_ptr<core::AlertDispatcher> dispatcher
+) : store_(store), dispatcher_(dispatcher) {}
 
 void ScreenD::evaluate(const std::string& date) {
     std::cout << "[ScreenD] Running Industry Rotation calculations for date: " << date << std::endl;
@@ -247,6 +250,44 @@ void ScreenD::evaluate(const std::string& date) {
         res.test_200ma = test_200;
 
         results.push_back(res);
+
+        // Check 200MA crossover and dispatch Interesting alert
+        if (bars.size() >= 201 && dispatcher_) {
+            double sum_200_prev = 0.0;
+            for (size_t i = bars.size() - 201; i < bars.size() - 1; ++i) {
+                sum_200_prev += bars[i].close;
+            }
+            double ma200_prev = sum_200_prev / 200.0;
+            double close_prev = bars[bars.size() - 2].close;
+
+            bool crossed_200 = (close_prev <= ma200_prev && close > ma200) || 
+                               (close_prev >= ma200_prev && close < ma200);
+
+            if (crossed_200) {
+                core::Alert alert;
+                alert.ts = date + "T16:00:00Z"; 
+                alert.screen = "D";
+                alert.tier = "interesting";
+                alert.instrument_id = inst_id;
+                alert.symbol = symbol;
+                
+                std::string regime_str = "Chop";
+                auto logs = store_->get_regime_log(1);
+                if (!logs.empty()) {
+                    regime_str = logs[0].regime;
+                }
+                alert.regime_at_alert = regime_str;
+
+                alert.suggested_entry_low = close;
+                alert.suggested_entry_high = close;
+                alert.suggested_stop = close * (close > ma200 ? 0.98 : 1.02); // 2% risk stop
+                alert.target_1 = close * (close > ma200 ? 1.06 : 0.94);      // 3R target
+                alert.rr_to_target_1 = 3.0;
+                alert.conviction_score = 1.0;
+
+                dispatcher_->dispatch(alert);
+            }
+        }
     }
 
     // 5. RS Ranking: sort descending by 12-month return
