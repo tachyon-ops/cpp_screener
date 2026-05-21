@@ -82,6 +82,10 @@ set(SOURCE_FILES
     src/screens/screen_b.cpp
     src/core/telegram.cpp
     src/core/alert_dispatcher.cpp
+    src/storage/time_series_store.cpp
+    src/screens/screen_a.cpp
+    src/screens/screen_e.cpp
+    src/screens/screen_f.cpp
 )
 
 # Executable target

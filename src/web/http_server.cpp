@@ -2,6 +2,10 @@
 #include "trader/core/regime_classifier.hpp"
 #include "trader/screens/screen_d.hpp"
 #include "trader/screens/screen_b.hpp"
+#include "trader/screens/screen_a.hpp"
+#include "trader/screens/screen_e.hpp"
+#include "trader/screens/screen_f.hpp"
+#include "trader/storage/time_series_store.hpp"
 #include <crow.h>
 #include <nlohmann/json.hpp>
 #include <iostream>
@@ -20,6 +24,10 @@ struct HttpServer::Impl {
     std::shared_ptr<core::RegimeClassifier> classifier;
     std::shared_ptr<screens::ScreenD> screen_d;
     std::shared_ptr<screens::ScreenB> screen_b;
+    std::shared_ptr<screens::ScreenA> screen_a;
+    std::shared_ptr<screens::ScreenE> screen_e;
+    std::shared_ptr<screens::ScreenF> screen_f;
+    std::shared_ptr<storage::TimeSeriesStore> ts_store;
     std::string public_dir;
     int port;
 
@@ -34,9 +42,13 @@ struct HttpServer::Impl {
         std::shared_ptr<core::RegimeClassifier> c,
         std::shared_ptr<screens::ScreenD> sd,
         std::shared_ptr<screens::ScreenB> sb,
+        std::shared_ptr<screens::ScreenA> sa,
+        std::shared_ptr<screens::ScreenE> se,
+        std::shared_ptr<screens::ScreenF> sf,
+        std::shared_ptr<storage::TimeSeriesStore> ts,
         std::string dir,
         int p
-    ) : store(std::move(s)), broker(std::move(b)), classifier(std::move(c)), screen_d(std::move(sd)), screen_b(std::move(sb)), public_dir(std::move(dir)), port(p) {}
+    ) : store(std::move(s)), broker(std::move(b)), classifier(std::move(c)), screen_d(std::move(sd)), screen_b(std::move(sb)), screen_a(std::move(sa)), screen_e(std::move(se)), screen_f(std::move(sf)), ts_store(std::move(ts)), public_dir(std::move(dir)), port(p) {}
 
     void broadcast(const std::string& text) {
         std::lock_guard<std::mutex> lock(ws_mutex);
@@ -96,9 +108,13 @@ HttpServer::HttpServer(
     std::shared_ptr<core::RegimeClassifier> classifier,
     std::shared_ptr<screens::ScreenD> screen_d,
     std::shared_ptr<screens::ScreenB> screen_b,
+    std::shared_ptr<screens::ScreenA> screen_a,
+    std::shared_ptr<screens::ScreenE> screen_e,
+    std::shared_ptr<screens::ScreenF> screen_f,
+    std::shared_ptr<storage::TimeSeriesStore> ts_store,
     const std::string& public_dir,
     int port
-) : pimpl_(std::make_unique<Impl>(std::move(store), std::move(broker), std::move(classifier), std::move(screen_d), std::move(screen_b), public_dir, port)) {
+) : pimpl_(std::make_unique<Impl>(std::move(store), std::move(broker), std::move(classifier), std::move(screen_d), std::move(screen_b), std::move(screen_a), std::move(screen_e), std::move(screen_f), std::move(ts_store), public_dir, port)) {
 
     // Define REST Endpoints
 
@@ -152,6 +168,21 @@ HttpServer::HttpServer(
                 } catch (...) {
                     obj["payload"] = alert.payload_json;
                 }
+
+                nlohmann::json res_arr = nlohmann::json::array();
+                auto responses = pimpl_->store->get_alert_responses(alert.id);
+                for (const auto& r : responses) {
+                    nlohmann::json r_obj;
+                    r_obj["id"] = r.id;
+                    r_obj["alert_id"] = r.alert_id;
+                    r_obj["response_ts"] = r.response_ts;
+                    r_obj["response_type"] = r.response_type;
+                    r_obj["skip_reason"] = r.skip_reason;
+                    r_obj["note_text"] = r.note_text;
+                    res_arr.push_back(r_obj);
+                }
+                obj["responses"] = res_arr;
+
                 arr.push_back(obj);
             }
             return crow::response(200, arr.dump());
@@ -166,17 +197,32 @@ HttpServer::HttpServer(
         try {
             auto body = nlohmann::json::parse(req.body);
             int64_t alert_id = body.at("alert_id").get<int64_t>();
-            std::string action = body.value("action", "dismiss"); // "execute" or "dismiss"
+            std::string action = body.value("action", "dismiss"); // "seen", "acted", "skipped", "noted", "deferred"
 
-            pimpl_->store->update_alert_acted(alert_id, 1);
+            // Construct and save the DbAlertResponse row
+            persistence::DbAlertResponse resp;
+            resp.alert_id = alert_id;
+            resp.response_type = action;
+            resp.skip_reason = body.value("skip_reason", "");
+            resp.note_text = body.value("note_text", "");
+            
+            auto now_time = std::chrono::system_clock::now();
+            auto time_val = std::chrono::system_clock::to_time_t(now_time);
+            std::stringstream ss;
+            ss << std::put_time(std::gmtime(&time_val), "%Y-%m-%dT%H:%M:%SZ");
+            resp.response_ts = ss.str();
+
+            pimpl_->store->add_alert_response(resp);
 
             nlohmann::json res;
             res["status"] = "success";
             res["alert_id"] = alert_id;
 
-            if (action == "execute") {
+            if (action == "execute" || action == "acted") {
+                pimpl_->store->update_alert_acted(alert_id, 1);
+
                 // Fetch alert details
-                auto alerts = pimpl_->store->get_alerts(100);
+                auto alerts = pimpl_->store->get_alerts(500);
                 persistence::DbAlert target_alert;
                 bool found = false;
                 for (const auto& a : alerts) {
@@ -188,10 +234,27 @@ HttpServer::HttpServer(
                 }
 
                 if (found) {
-                    // Try to execute simulated trade
                     nlohmann::json payload = nlohmann::json::parse(target_alert.payload_json);
                     std::string sym = payload.value("symbol", "");
                     double price = payload.value("price", 0.0);
+                    
+                    double units = 100.0; // Default fallback
+                    std::string risk_tier = body.value("risk_tier", "");
+                    std::string size_key = "";
+                    if (risk_tier == "1%" || risk_tier == "1pct" || risk_tier == "size_1pct" || risk_tier == "1") {
+                        size_key = "size_1pct";
+                    } else if (risk_tier == "2%" || risk_tier == "2pct" || risk_tier == "size_2pct" || risk_tier == "2") {
+                        size_key = "size_2pct";
+                    } else if (risk_tier == "5%" || risk_tier == "5pct" || risk_tier == "size_5pct" || risk_tier == "5") {
+                        size_key = "size_5pct";
+                    }
+
+                    if (!size_key.empty() && payload.contains(size_key)) {
+                        auto sz_obj = payload[size_key];
+                        if (sz_obj.contains("units")) {
+                            units = sz_obj["units"].get<double>();
+                        }
+                    }
                     
                     if (!sym.empty()) {
                         auto inst_info_res = pimpl_->broker->lookup_symbol(sym);
@@ -202,22 +265,27 @@ HttpServer::HttpServer(
                             order.instrument = inst_info.id;
                             order.side = "buy";
                             order.type = "market";
-                            order.size.value = 100; // Default amount
+                            order.size.value = units;
                             
                             auto order_res = pimpl_->broker->place_order(order);
                             if (order_res.is_ok()) {
                                 res["order_id"] = order_res.value();
-                                res["message"] = "Order executed successfully via Saxo Broker: " + order_res.value();
+                                res["units"] = units;
+                                res["message"] = "Order executed successfully via Saxo Broker: " + order_res.value() + " (" + std::to_string((int)units) + " units)";
                             } else {
-                                res["message"] = "DB updated but Order failed: " + order_res.error();
+                                res["message"] = "DB response added but Order failed: " + order_res.error();
                             }
                         } else {
-                            res["message"] = "DB updated but Symbol lookup failed: " + inst_info_res.error();
+                            res["message"] = "DB response added but Symbol lookup failed: " + inst_info_res.error();
                         }
+                    } else {
+                        res["message"] = "DB response added but symbol is empty in payload.";
                     }
+                } else {
+                    res["message"] = "DB response added but Alert ID not found.";
                 }
             } else {
-                res["message"] = "Alert marked as dismissed.";
+                res["message"] = "Alert response of type '" + action + "' saved.";
             }
 
             return crow::response(200, res.dump());
@@ -453,6 +521,15 @@ HttpServer::HttpServer(
             if (pimpl_->screen_b) {
                 pimpl_->screen_b->evaluate(date);
             }
+            if (pimpl_->screen_a) {
+                pimpl_->screen_a->evaluate(date);
+            }
+            if (pimpl_->screen_e) {
+                pimpl_->screen_e->evaluate(date);
+            }
+            if (pimpl_->screen_f) {
+                pimpl_->screen_f->evaluate(date);
+            }
 
             // Fetch the updated log to broadcast
             auto logs = pimpl_->store->get_regime_log(1);
@@ -546,6 +623,80 @@ HttpServer::HttpServer(
         .onmessage([this](crow::websocket::connection& conn, const std::string& data, bool is_binary) {
             // Echo or handle client messages if necessary
         });
+
+    // 9. POST /api/trigger_gap_down
+    CROW_ROUTE(pimpl_->app, "/api/trigger_gap_down").methods(crow::HTTPMethod::POST)([this](const crow::request& req) {
+        try {
+            if (!pimpl_->screen_a) {
+                nlohmann::json err = {{"error", "ScreenA component not registered."}};
+                return crow::response(500, err.dump());
+            }
+            auto body = nlohmann::json::parse(req.body);
+            std::string symbol = body.at("symbol").get<std::string>();
+            double gap_pct = body.at("gap_percent").get<double>();
+            std::string news = body.value("news", "Simulated corporate news");
+            bool is_existential = body.value("is_existential", false);
+            
+            pimpl_->screen_a->trigger_mock_gap_down(symbol, gap_pct, news, is_existential);
+            
+            nlohmann::json res;
+            res["status"] = "success";
+            res["symbol"] = symbol;
+            res["gap_percent"] = gap_pct;
+            res["message"] = "Mock gap down registered for " + symbol;
+            return crow::response(200, res.dump());
+        } catch (const std::exception& e) {
+            nlohmann::json err = {{"error", e.what()}};
+            return crow::response(500, err.dump());
+        }
+    });
+
+    // 10. GET /api/intraday_bars
+    CROW_ROUTE(pimpl_->app, "/api/intraday_bars")([this](const crow::request& req) {
+        try {
+            if (!pimpl_->ts_store) {
+                nlohmann::json err = {{"error", "TimeSeriesStore component not registered."}};
+                return crow::response(500, err.dump());
+            }
+            std::string symbol = req.url_params.get("symbol") ? req.url_params.get("symbol") : "";
+            std::string res_str = req.url_params.get("resolution") ? req.url_params.get("resolution") : "M5";
+            int limit = req.url_params.get("limit") ? std::stoi(req.url_params.get("limit")) : 200;
+            
+            if (symbol.empty()) {
+                nlohmann::json err = {{"error", "Missing query parameter 'symbol'."}};
+                return crow::response(400, err.dump());
+            }
+            
+            auto ts = pimpl_->ts_store->get(symbol);
+            if (!ts) {
+                nlohmann::json err = {{"error", "No data found for symbol: " + symbol}};
+                return crow::response(404, err.dump());
+            }
+            
+            core::Resolution resolution = core::Resolution::M5;
+            if (res_str == "M1") resolution = core::Resolution::M1;
+            else if (res_str == "H1") resolution = core::Resolution::H1;
+            else if (res_str == "D1") resolution = core::Resolution::D1;
+            
+            auto bars = ts->last_n(resolution, limit);
+            nlohmann::json arr = nlohmann::json::array();
+            for (const auto& b : bars) {
+                nlohmann::json obj;
+                obj["ts"] = b.ts.ms_since_epoch;
+                obj["open"] = b.open.value;
+                obj["high"] = b.high.value;
+                obj["low"] = b.low.value;
+                obj["close"] = b.close.value;
+                obj["volume"] = b.volume.value;
+                arr.push_back(obj);
+            }
+            
+            return crow::response(200, arr.dump());
+        } catch (const std::exception& e) {
+            nlohmann::json err = {{"error", e.what()}};
+            return crow::response(500, err.dump());
+        }
+    });
 
     // SPA static file fallback / serve wildcard
     CROW_ROUTE(pimpl_->app, "/<path>")([this](const crow::request& req, std::string path) {

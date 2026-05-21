@@ -452,7 +452,8 @@ void ScreenB::evaluate(const std::string& date) {
                 auto time = std::chrono::system_clock::to_time_t(now);
                 std::stringstream ss;
                 ss << std::put_time(std::gmtime(&time), "%Y-%m-%dT%H:%M:%SZ");
-                c.created_ts = ss.str();
+                std::string ts_str = ss.str();
+                c.created_ts = ts_str;
                 
                 c.screen = "B";
                 c.instrument_id = opt_stock->id;
@@ -469,7 +470,7 @@ void ScreenB::evaluate(const std::string& date) {
 
                 if (dispatcher_) {
                     core::Alert alert;
-                    alert.ts = c.created_ts;
+                    alert.ts = ts_str;
                     alert.screen = "B";
                     alert.tier = results[i].setup_tier;
                     alert.instrument_id = opt_stock->id;

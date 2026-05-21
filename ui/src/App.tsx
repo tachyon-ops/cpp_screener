@@ -10,6 +10,15 @@ interface Instrument {
   metadata?: any;
 }
 
+interface AlertResponse {
+  id: number;
+  alert_id: number;
+  response_ts: string;
+  response_type: string; // 'seen','acted','skipped','noted','deferred'
+  skip_reason: string;
+  note_text: string;
+}
+
 interface Alert {
   id: number;
   ts: string;
@@ -20,10 +29,14 @@ interface Alert {
     symbol: string;
     price: number;
     trigger: string;
+    size_1pct?: { units: number; cost: number; pct_account: number; capped: boolean };
+    size_2pct?: { units: number; cost: number; pct_account: number; capped: boolean };
+    size_5pct?: { units: number; cost: number; pct_account: number; capped: boolean };
     [key: string]: any;
   };
   regime_at_alert: string;
   acted_on: number;
+  responses?: AlertResponse[];
 }
 
 interface Regime {
@@ -70,6 +83,49 @@ interface RotationResult {
   test_200ma: boolean;
 }
 
+const getAlertStatus = (alert: Alert) => {
+  if (alert.responses && alert.responses.length > 0) {
+    const statusResp = alert.responses.find(r => r.response_type !== 'noted');
+    if (statusResp) {
+      return statusResp.response_type;
+    }
+  }
+  return alert.acted_on === 1 ? 'acted' : 'pending';
+};
+
+const getAlertSizes = (alert: Alert) => {
+  const payload = alert.payload;
+  if (payload.size_1pct && payload.size_2pct && payload.size_5pct) {
+    return {
+      size_1pct: payload.size_1pct,
+      size_2pct: payload.size_2pct,
+      size_5pct: payload.size_5pct
+    };
+  }
+
+  // Fallback capital-allocation sizing (1%, 2%, 5% of a $1M account)
+  const price = payload.price || 100.0;
+  const equity = 1000000.0;
+
+  const calcFallback = (riskPct: number) => {
+    const cost = equity * riskPct;
+    const units = Math.floor(cost / price);
+    const pct_account = riskPct * 100;
+    return {
+      units,
+      cost,
+      pct_account,
+      capped: false
+    };
+  };
+
+  return {
+    size_1pct: calcFallback(0.01),
+    size_2pct: calcFallback(0.02),
+    size_5pct: calcFallback(0.05)
+  };
+};
+
 function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'alerts' | 'candidates' | 'universe' | 'rotation' | 'settings'>('dashboard');
   const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -97,6 +153,11 @@ function App() {
   const [onboardAssetClass, setOnboardAssetClass] = useState<string>('Stock');
   const [onboardingStatus, setOnboardingStatus] = useState<string>('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  // Alert management state
+  const [selectedRiskTiers, setSelectedRiskTiers] = useState<Record<number, string>>({});
+  const [activeSkipDropdown, setActiveSkipDropdown] = useState<number | null>(null);
+  const [notesText, setNotesText] = useState<Record<number, string>>({});
 
   // Candidates creation form
   const [showCandForm, setShowCandForm] = useState(false);
@@ -228,19 +289,25 @@ function App() {
   };
 
   // Place Order/Act on alert
-  const handleActOnAlert = async (alertId: number, action: 'execute' | 'dismiss') => {
+  const handleActOnAlert = async (alertId: number, action: string, skipReason?: string, noteText?: string, riskTier?: string) => {
     try {
       const response = await fetch('/api/alert_response', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ alert_id: alertId, action })
+        body: JSON.stringify({ 
+          alert_id: alertId, 
+          action, 
+          skip_reason: skipReason || '',
+          note_text: noteText || '',
+          risk_tier: riskTier || ''
+        })
       });
       const data = await response.json();
       if (response.ok) {
-        if (action === 'execute') {
+        if (action === 'execute' || action === 'acted') {
           showToast(data.message || 'Trade executed successfully!', 'success');
         } else {
-          showToast('Alert dismissed.', 'info');
+          showToast(`Alert response '${action}' recorded.`, 'info');
         }
         fetchData();
       } else {
@@ -571,7 +638,17 @@ function App() {
                     <div key={alert.id} className="glass border border-white/5 p-5 rounded-xl hover:border-white/10 transition duration-200">
                       <div className="flex justify-between items-start">
                         <div className="flex items-center gap-3">
-                          <span className="px-2.5 py-1 rounded bg-[#ff6d5a]/10 border border-[#ff6d5a]/20 text-[#ff6d5a] font-mono text-xs font-bold">
+                          <span className={`px-2.5 py-1 rounded font-mono text-xs font-bold border ${
+                            alert.screen === 'A'
+                              ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                              : alert.screen === 'B'
+                              ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'
+                              : alert.screen === 'E'
+                              ? 'bg-violet-500/10 border-violet-500/20 text-violet-400'
+                              : alert.screen === 'F'
+                              ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                              : 'bg-[#ff6d5a]/10 border-[#ff6d5a]/20 text-[#ff6d5a]'
+                          }`}>
                             Screen {alert.screen}
                           </span>
                           <span className="font-bold text-white text-base font-mono">
@@ -698,87 +775,436 @@ function App() {
         )}
 
         {/* Alerts Page Tab */}
-        {activeTab === 'alerts' && (
-          <div className="space-y-6 animate-fade-in">
-            <div className="flex justify-between items-center">
-              <div>
-                <h2 className="text-2xl font-bold text-white">Market Screener Alerts</h2>
-                <p className="text-xs text-gray-400 mt-1">Real-time alerts generated across active algorithmic screens.</p>
+        {activeTab === 'alerts' && (() => {
+          // Compute status counts dynamically
+          let total = alerts.length;
+          let pending = 0;
+          let seen = 0;
+          let acted = 0;
+          let skipped = 0;
+          let deferred = 0;
+
+          alerts.forEach(alert => {
+            const status = getAlertStatus(alert);
+            if (status === 'pending') pending++;
+            else if (status === 'seen') seen++;
+            else if (status === 'acted' || status === 'execute') acted++;
+            else if (status === 'skipped') skipped++;
+            else if (status === 'deferred') deferred++;
+          });
+
+          const skipReasonOptions = [
+            "Wrong regime",
+            "Bad news",
+            "Size too large",
+            "Correlated pos",
+            "Don't trust",
+            "Other"
+          ];
+
+          return (
+            <div className="space-y-6 animate-fade-in text-left">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold text-white tracking-tight">Market Screener Alerts</h2>
+                  <p className="text-xs text-gray-400 mt-1">Real-time alerts generated across active algorithmic screens.</p>
+                </div>
               </div>
-              <div className="text-xs text-gray-400">
-                Total Signals: <span className="text-white font-bold font-mono">{alerts.length}</span>
+
+              {/* Statistics Cards Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+                <div className="glass border border-white/5 p-4 rounded-xl flex flex-col">
+                  <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Total Signals</span>
+                  <span className="text-2xl font-extrabold text-white mt-1 font-mono">{total}</span>
+                </div>
+                <div className="glass border border-amber-500/10 p-4 rounded-xl flex flex-col shadow-[0_0_15px_rgba(245,158,11,0.02)]">
+                  <span className="text-[10px] text-amber-400 uppercase font-bold tracking-wider">Pending</span>
+                  <span className="text-2xl font-extrabold text-amber-400 mt-1 font-mono">{pending}</span>
+                </div>
+                <div className="glass border border-blue-500/10 p-4 rounded-xl flex flex-col shadow-[0_0_15px_rgba(59,130,246,0.02)]">
+                  <span className="text-[10px] text-blue-400 uppercase font-bold tracking-wider">Seen</span>
+                  <span className="text-2xl font-extrabold text-blue-400 mt-1 font-mono">{seen}</span>
+                </div>
+                <div className="glass border border-emerald-500/10 p-4 rounded-xl flex flex-col shadow-[0_0_15px_rgba(16,185,129,0.02)]">
+                  <span className="text-[10px] text-emerald-400 uppercase font-bold tracking-wider">Acted / Filled</span>
+                  <span className="text-2xl font-extrabold text-emerald-400 mt-1 font-mono">{acted}</span>
+                </div>
+                <div className="glass border border-rose-500/10 p-4 rounded-xl flex flex-col shadow-[0_0_15px_rgba(244,63,94,0.02)]">
+                  <span className="text-[10px] text-rose-400 uppercase font-bold tracking-wider">Skipped</span>
+                  <span className="text-2xl font-extrabold text-rose-400 mt-1 font-mono">{skipped}</span>
+                </div>
+                <div className="glass border border-purple-500/10 p-4 rounded-xl flex flex-col shadow-[0_0_15px_rgba(168,85,247,0.02)]">
+                  <span className="text-[10px] text-purple-400 uppercase font-bold tracking-wider">Deferred</span>
+                  <span className="text-2xl font-extrabold text-purple-400 mt-1 font-mono">{deferred}</span>
+                </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-              {alerts.map((alert) => (
-                <div key={alert.id} className="glass border border-white/5 p-6 rounded-xl hover:border-white/10 transition">
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-3">
-                      <span className="px-2.5 py-1 rounded bg-[#ff6d5a]/10 border border-[#ff6d5a]/20 text-[#ff6d5a] font-mono text-xs font-bold">
-                        Screen {alert.screen}
-                      </span>
-                      <span className="font-bold text-white text-base font-mono">
-                        {alert.payload.symbol}
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-gray-500 font-mono">
-                      {new Date(alert.ts).toLocaleString()}
-                    </span>
-                  </div>
+              {/* Alerts Cards List/Grid */}
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                {alerts.map((alert) => {
+                  const sizes = getAlertSizes(alert);
+                  const status = getAlertStatus(alert);
+                  const selectedTier = selectedRiskTiers[alert.id];
+                  const noteInput = notesText[alert.id] !== undefined ? notesText[alert.id] : (alert.responses?.find(r => r.note_text)?.note_text || '');
 
-                  <p className="text-xs text-gray-300 mt-4 leading-relaxed">
-                    {alert.payload.trigger}
-                  </p>
-
-                  {/* Render technical detail points */}
-                  <div className="grid grid-cols-2 gap-3 mt-4 bg-black/20 p-3 rounded-lg border border-white/5">
-                    {Object.entries(alert.payload)
-                      .filter(([key]) => key !== 'symbol' && key !== 'trigger' && key !== 'price')
-                      .map(([key, val]) => (
-                        <div key={key} className="text-xs flex justify-between">
-                          <span className="text-gray-500 capitalize">{key.replace('_', ' ')}:</span>
-                          <span className="text-gray-300 font-mono font-medium">{val}</span>
+                  return (
+                    <div key={alert.id} className="glass border border-white/5 p-6 rounded-xl flex flex-col justify-between hover:border-white/10 transition duration-200">
+                      <div>
+                        {/* Header */}
+                        <div className="flex justify-between items-start">
+                          <div className="flex items-center gap-3">
+                            <span className={`px-2.5 py-1 rounded font-mono text-xs font-bold border ${
+                              alert.screen === 'A'
+                                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                                : alert.screen === 'B'
+                                ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'
+                                : alert.screen === 'E'
+                                ? 'bg-violet-500/10 border-violet-500/20 text-violet-400'
+                                : alert.screen === 'F'
+                                ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                                : 'bg-[#ff6d5a]/10 border-[#ff6d5a]/20 text-[#ff6d5a]'
+                            }`}>
+                              Screen {alert.screen}
+                            </span>
+                            <span className="font-bold text-white text-lg font-mono">
+                              {alert.payload.symbol}
+                            </span>
+                            <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${
+                              alert.tier === 'premium' ? 'bg-[#ff6d5a]/20 text-[#ff6d5a]' : 'bg-[#825aff]/20 text-[#825aff]'
+                            }`}>
+                              {alert.tier}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-gray-500 font-mono">
+                            {new Date(alert.ts).toLocaleString()}
+                          </span>
                         </div>
-                    ))}
-                  </div>
 
-                  <div className="mt-5 pt-4 border-t border-white/5 flex justify-between items-center">
-                    <div className="text-xs font-mono text-gray-400">
-                      Execution Price: <span className="text-white font-bold">${alert.payload.price}</span>
-                    </div>
+                        {/* Trigger Message */}
+                        <p className="text-sm text-gray-200 mt-4 leading-relaxed font-semibold">
+                          {alert.payload.trigger}
+                        </p>
 
-                    {alert.acted_on === 0 ? (
-                      <div className="flex gap-2">
-                        <button 
-                          onClick={() => handleActOnAlert(alert.id, 'dismiss')}
-                          className="px-3 py-1.5 rounded bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium transition"
-                        >
-                          Dismiss
-                        </button>
-                        <button 
-                          onClick={() => handleActOnAlert(alert.id, 'execute')}
-                          className="px-3 py-1.5 rounded bg-[#ff6d5a] hover:bg-[#ff8c7a] text-black text-xs font-bold transition"
-                        >
-                          Act / Place Order
-                        </button>
+                        {/* Technical Details Grid */}
+                        <div className="grid grid-cols-2 gap-2 mt-4 bg-black/25 p-3 rounded-lg border border-white/5">
+                          <div className="text-xs flex justify-between">
+                            <span className="text-gray-500">Execution Price:</span>
+                            <span className="text-white font-mono font-bold">${alert.payload.price}</span>
+                          </div>
+                          <div className="text-xs flex justify-between">
+                            <span className="text-gray-500">Regime At Alert:</span>
+                            <span className="text-white font-mono capitalize font-bold">{alert.regime_at_alert}</span>
+                          </div>
+                          {Object.entries(alert.payload)
+                            .filter(([key]) => key !== 'symbol' && key !== 'trigger' && key !== 'price' && !key.startsWith('size_') && key !== 'confluence_factors' && key !== 'news_summary')
+                            .map(([key, val]) => {
+                              let displayKey = key.replace(/_/g, ' ');
+                              let displayVal = typeof val === 'number' ? val.toFixed(2) : String(val);
+                              
+                              if (key === 'vwap') {
+                                displayKey = 'VWAP';
+                              } else if (key === 'stddev') {
+                                displayKey = 'Std Dev';
+                              } else if (key === 'deviation_sigma') {
+                                displayKey = 'Deviation (σ)';
+                                displayVal = typeof val === 'number' ? `${val.toFixed(2)}σ` : displayVal;
+                              } else if (key === 'volume_5m') {
+                                displayKey = '5m Volume';
+                                displayVal = typeof val === 'number' ? val.toLocaleString() : displayVal;
+                              } else if (key === 'avg_volume_5m_slot') {
+                                displayKey = 'Avg Slot Vol';
+                                displayVal = typeof val === 'number' ? Math.round(val).toLocaleString() : displayVal;
+                              } else if (key === 'sector_change') {
+                                displayKey = 'Sector Change';
+                                displayVal = typeof val === 'number' ? `${(val * 100).toFixed(2)}%` : displayVal;
+                              } else if (key === 'rs_1m') {
+                                displayKey = '1m RS vs SPY';
+                                displayVal = typeof val === 'number' ? `${(val * 100).toFixed(2)}%` : displayVal;
+                              } else if (key === 'nav') {
+                                displayKey = 'NAV';
+                                displayVal = typeof val === 'number' ? `$${val.toFixed(2)}` : displayVal;
+                              } else if (key === 'discount') {
+                                displayKey = 'Discount';
+                                displayVal = typeof val === 'number' ? `${(val * 100).toFixed(2)}%` : displayVal;
+                              } else if (key === 'mean_discount') {
+                                displayKey = 'Mean Discount';
+                                displayVal = typeof val === 'number' ? `${(val * 100).toFixed(2)}%` : displayVal;
+                              } else if (key === 'stddev_discount') {
+                                displayKey = 'Std Dev Discount';
+                                displayVal = typeof val === 'number' ? `${(val * 100).toFixed(2)}%` : displayVal;
+                              } else if (key === 'discount_sigma') {
+                                displayKey = 'Discount (σ)';
+                                displayVal = typeof val === 'number' ? `${val.toFixed(2)}σ` : displayVal;
+                              } else if (key === 'leverage_ratio') {
+                                displayKey = 'Leverage Ratio';
+                                displayVal = typeof val === 'number' ? `${(val * 100).toFixed(2)}%` : displayVal;
+                              } else if (key === 'avg_dollar_volume') {
+                                displayKey = 'Avg Dollar Vol';
+                                displayVal = typeof val === 'number' ? `$${val.toLocaleString()}` : displayVal;
+                              } else if (key === 'box_top') {
+                                displayKey = 'Box Top';
+                                displayVal = typeof val === 'number' ? `$${val.toFixed(2)}` : displayVal;
+                              } else if (key === 'box_bottom') {
+                                displayKey = 'Box Bottom';
+                                displayVal = typeof val === 'number' ? `$${val.toFixed(2)}` : displayVal;
+                              } else if (key === 'box_height_pct') {
+                                displayKey = 'Box Height';
+                                displayVal = typeof val === 'number' ? `${(val * 100).toFixed(2)}%` : displayVal;
+                              } else if (key === 'consolidation_days') {
+                                displayKey = 'Consolidation';
+                                displayVal = `${val} days`;
+                              } else if (key === 'volume_ratio') {
+                                displayKey = 'Volume Ratio';
+                                displayVal = typeof val === 'number' ? `${val.toFixed(2)}x` : displayVal;
+                              } else if (key === 'sector_above_ma200') {
+                                displayKey = 'Sector Trend';
+                                displayVal = val > 0 ? 'Yes (Above 200MA)' : 'No (Below 200MA)';
+                              }
+                              
+                              return (
+                                <div key={key} className="text-xs flex justify-between">
+                                  <span className="text-gray-500 capitalize">{displayKey}:</span>
+                                  <span className="text-gray-300 font-mono">{displayVal}</span>
+                                </div>
+                              );
+                            })}
+                        </div>
+
+                        {/* Catalyst News block for Screen A */}
+                        {alert.payload.news_summary && (
+                          <div className="mt-3 p-3 bg-red-500/5 border border-red-500/10 rounded-lg">
+                            <span className="text-[10px] text-red-400 font-bold uppercase tracking-wider block mb-1">Catalyst News</span>
+                            <p className="text-xs text-gray-300 italic">"{alert.payload.news_summary}"</p>
+                          </div>
+                        )}
+
+                        {/* Confluence factors tags */}
+                        {alert.payload.confluence_factors && Array.isArray(alert.payload.confluence_factors) && (
+                          <div className="flex flex-wrap gap-1.5 mt-3">
+                            {alert.payload.confluence_factors.map((factor, idx) => (
+                              <span key={idx} className="text-[10px] bg-white/5 border border-white/10 text-gray-400 px-2 py-0.5 rounded font-mono">
+                                {factor}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Position Sizing Cards */}
+                        <div className="mt-5">
+                          <span className="text-xs font-bold text-white uppercase tracking-wider">Position Sizing Tiers</span>
+                          <div className="grid grid-cols-3 gap-3 mt-2">
+                            {/* 1% Card */}
+                            <button
+                              onClick={() => setSelectedRiskTiers(prev => ({ ...prev, [alert.id]: '1%' }))}
+                              disabled={status === 'acted' || status === 'execute'}
+                              className={`p-3 rounded-lg border text-left transition duration-200 flex flex-col justify-between ${
+                                selectedTier === '1%'
+                                  ? 'bg-[#825aff]/20 border-[#825aff] shadow-[0_0_10px_rgba(130,90,255,0.2)]'
+                                  : 'bg-black/20 border-white/5 hover:border-white/10'
+                              } ${status === 'acted' || status === 'execute' ? 'opacity-60 cursor-not-allowed' : ''}`}
+                            >
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs font-bold text-white font-mono">1% Risk</span>
+                                {sizes.size_1pct.capped && (
+                                  <span className="text-[8px] font-extrabold bg-rose-500/20 text-rose-400 border border-rose-500/30 px-1 rounded">CAPPED</span>
+                                )}
+                              </div>
+                              <div className="mt-2">
+                                <div className="text-sm font-extrabold text-white font-mono">{sizes.size_1pct.units.toLocaleString()} <span className="text-[10px] text-gray-400 font-normal">units</span></div>
+                                <div className="text-[10px] text-gray-400 font-mono mt-0.5">${Math.round(sizes.size_1pct.cost).toLocaleString()}</div>
+                                <div className="text-[9px] text-[#825aff] font-bold font-mono mt-1">{sizes.size_1pct.pct_account.toFixed(1)}% acct</div>
+                              </div>
+                            </button>
+
+                            {/* 2% Card */}
+                            <button
+                              onClick={() => setSelectedRiskTiers(prev => ({ ...prev, [alert.id]: '2%' }))}
+                              disabled={status === 'acted' || status === 'execute'}
+                              className={`p-3 rounded-lg border text-left transition duration-200 flex flex-col justify-between ${
+                                selectedTier === '2%'
+                                  ? 'bg-[#825aff]/20 border-[#825aff] shadow-[0_0_10px_rgba(130,90,255,0.2)]'
+                                  : 'bg-black/20 border-white/5 hover:border-white/10'
+                              } ${status === 'acted' || status === 'execute' ? 'opacity-60 cursor-not-allowed' : ''}`}
+                            >
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs font-bold text-white font-mono">2% Risk</span>
+                                {sizes.size_2pct.capped && (
+                                  <span className="text-[8px] font-extrabold bg-rose-500/20 text-rose-400 border border-rose-500/30 px-1 rounded">CAPPED</span>
+                                )}
+                              </div>
+                              <div className="mt-2">
+                                <div className="text-sm font-extrabold text-white font-mono">{sizes.size_2pct.units.toLocaleString()} <span className="text-[10px] text-gray-400 font-normal">units</span></div>
+                                <div className="text-[10px] text-gray-400 font-mono mt-0.5">${Math.round(sizes.size_2pct.cost).toLocaleString()}</div>
+                                <div className="text-[9px] text-[#825aff] font-bold font-mono mt-1">{sizes.size_2pct.pct_account.toFixed(1)}% acct</div>
+                              </div>
+                            </button>
+
+                            {/* 5% Card */}
+                            <button
+                              onClick={() => setSelectedRiskTiers(prev => ({ ...prev, [alert.id]: '5%' }))}
+                              disabled={status === 'acted' || status === 'execute'}
+                              className={`p-3 rounded-lg border text-left transition duration-200 flex flex-col justify-between ${
+                                selectedTier === '5%'
+                                  ? 'bg-[#825aff]/20 border-[#825aff] shadow-[0_0_10px_rgba(130,90,255,0.2)]'
+                                  : 'bg-black/20 border-white/5 hover:border-white/10'
+                              } ${status === 'acted' || status === 'execute' ? 'opacity-60 cursor-not-allowed' : ''}`}
+                            >
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs font-bold text-white font-mono">5% Risk</span>
+                                {sizes.size_5pct.capped && (
+                                  <span className="text-[8px] font-extrabold bg-rose-500/20 text-rose-400 border border-rose-500/30 px-1 rounded">CAPPED</span>
+                                )}
+                              </div>
+                              <div className="mt-2">
+                                <div className="text-sm font-extrabold text-white font-mono">{sizes.size_5pct.units.toLocaleString()} <span className="text-[10px] text-gray-400 font-normal">units</span></div>
+                                <div className="text-[10px] text-gray-400 font-mono mt-0.5">${Math.round(sizes.size_5pct.cost).toLocaleString()}</div>
+                                <div className="text-[9px] text-[#825aff] font-bold font-mono mt-1">{sizes.size_5pct.pct_account.toFixed(1)}% acct</div>
+                              </div>
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    ) : (
-                      <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1.5">
-                        ✓ Acted & Filled
-                      </span>
-                    )}
+
+                      <div className="mt-5 space-y-4 pt-4 border-t border-white/5">
+                        {/* Notes input */}
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="Add research note..."
+                            value={noteInput}
+                            onChange={(e) => setNotesText(prev => ({ ...prev, [alert.id]: e.target.value }))}
+                            className="bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-white/20 flex-grow"
+                          />
+                          <button
+                            onClick={() => handleActOnAlert(alert.id, 'noted', undefined, noteInput)}
+                            className="px-3 py-1.5 rounded bg-white/5 hover:bg-white/10 border border-white/5 text-gray-300 text-xs font-medium transition"
+                          >
+                            Save Note
+                          </button>
+                        </div>
+
+                        {/* Interactive Buttons */}
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            {status !== 'acted' && status !== 'execute' ? (
+                              <>
+                                <button
+                                  onClick={() => handleActOnAlert(alert.id, 'seen')}
+                                  className={`px-3 py-1.5 rounded text-xs font-medium transition border ${
+                                    status === 'seen'
+                                      ? 'bg-blue-500/10 border-blue-500/20 text-blue-400'
+                                      : 'bg-white/5 border-white/5 hover:bg-white/10 text-gray-300'
+                                  }`}
+                                >
+                                  Saw It
+                                </button>
+                                <button
+                                  onClick={() => handleActOnAlert(alert.id, 'deferred')}
+                                  className={`px-3 py-1.5 rounded text-xs font-medium transition border ${
+                                    status === 'deferred'
+                                      ? 'bg-purple-500/10 border-purple-500/20 text-purple-400'
+                                      : 'bg-white/5 border-white/5 hover:bg-white/10 text-gray-300'
+                                  }`}
+                                >
+                                  Defer
+                                </button>
+                                <div className="relative">
+                                  <button
+                                    onClick={() => setActiveSkipDropdown(prev => prev === alert.id ? null : alert.id)}
+                                    className={`px-3 py-1.5 rounded text-xs font-medium transition border flex items-center gap-1.5 ${
+                                      status === 'skipped'
+                                        ? 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+                                        : 'bg-white/5 border-white/5 hover:bg-white/10 text-gray-300'
+                                    }`}
+                                  >
+                                    Skip {status === 'skipped' && `(${alert.responses?.find(r => r.response_type === 'skipped')?.skip_reason || 'Reason'})`} ▾
+                                  </button>
+                                  {activeSkipDropdown === alert.id && (
+                                    <div className="absolute left-0 bottom-full mb-1 z-20 w-44 bg-black border border-white/10 rounded-lg shadow-xl py-1 divide-y divide-white/5 font-normal">
+                                      {skipReasonOptions.map(r => (
+                                        <button
+                                          key={r}
+                                          type="button"
+                                          onClick={() => {
+                                            handleActOnAlert(alert.id, 'skipped', r);
+                                            setActiveSkipDropdown(null);
+                                          }}
+                                          className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-white/5 hover:text-white transition"
+                                        >
+                                          {r}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </>
+                            ) : (
+                              <span className="text-xs text-emerald-400 font-bold flex items-center gap-1.5">
+                                ✓ Order Filled
+                              </span>
+                            )}
+                          </div>
+
+                          {status !== 'acted' && status !== 'execute' && (
+                            <button
+                              onClick={() => {
+                                if (selectedTier) {
+                                  handleActOnAlert(alert.id, 'execute', undefined, undefined, selectedTier);
+                                }
+                              }}
+                              disabled={!selectedTier}
+                              className={`px-4 py-2 rounded text-xs font-bold transition flex items-center gap-1.5 ${
+                                selectedTier
+                                  ? 'bg-[#ff6d5a] hover:bg-[#ff8c7a] text-black shadow-lg shadow-[#ff6d5a]/10'
+                                  : 'bg-white/5 text-gray-500 border border-white/5 cursor-not-allowed'
+                              }`}
+                            >
+                              Place Order {selectedTier && `(${selectedTier})`}
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Audit Timeline */}
+                        {alert.responses && alert.responses.length > 0 && (
+                          <div className="mt-4 pt-3 border-t border-white/5 space-y-1.5">
+                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Audit Timeline</span>
+                            <div className="space-y-1 font-mono text-[10px] text-gray-400">
+                              {[...alert.responses].reverse().map((r) => {
+                                let label = '';
+                                switch(r.response_type) {
+                                  case 'seen': label = '👁 Marked Seen'; break;
+                                  case 'deferred': label = '⏳ Deferred'; break;
+                                  case 'skipped': label = `🚫 Skipped: "${r.skip_reason}"`; break;
+                                  case 'noted': label = `📝 Note added: "${r.note_text}"`; break;
+                                  case 'acted': 
+                                  case 'execute': 
+                                    label = '🛒 Order Executed'; break;
+                                  default: label = r.response_type;
+                                }
+                                return (
+                                  <div key={r.id} className="flex justify-between items-center bg-white/5 px-2 py-1 rounded">
+                                    <span className="truncate max-w-[280px]">{label}</span>
+                                    <span className="text-gray-500 font-mono">{new Date(r.response_ts).toLocaleTimeString()}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {alerts.length === 0 && (
+                  <div className="glass border border-white/5 p-12 rounded-xl text-center text-gray-500 text-sm col-span-full">
+                    No alerts generated yet. Waiting for market price ticks...
                   </div>
-                </div>
-              ))}
-              {alerts.length === 0 && (
-                <div className="glass border border-white/5 p-12 rounded-xl text-center text-gray-500 text-sm col-span-2">
-                  No alerts generated yet. Waiting for market price ticks...
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Candidates Page Tab - Swing Watchlist Dashboard */}
         {activeTab === 'candidates' && (() => {

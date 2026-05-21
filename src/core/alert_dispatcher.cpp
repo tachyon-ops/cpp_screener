@@ -195,6 +195,64 @@ void AlertDispatcher::set_alert_callback(std::function<void(const std::string&)>
     alert_cb_ = cb;
 }
 
+namespace {
+nlohmann::json serialize_size(const Alert::PositionSize& s) {
+    nlohmann::json sz;
+    sz["units"] = s.units;
+    sz["cost"] = s.cost;
+    sz["pct_account"] = s.pct_account;
+    sz["capped"] = s.capped;
+    return sz;
+}
+
+void add_position_sizes_to_payload(nlohmann::json& payload, const Alert& alert) {
+    payload["size_1pct"] = serialize_size(alert.size_1pct);
+    payload["size_2pct"] = serialize_size(alert.size_2pct);
+    payload["size_5pct"] = serialize_size(alert.size_5pct);
+}
+
+nlohmann::json build_alert_payload(const Alert& alert, const std::string& default_trigger = "") {
+    nlohmann::json payload;
+    payload["symbol"] = alert.symbol;
+    payload["suggested_entry_low"] = alert.suggested_entry_low;
+    payload["suggested_entry_high"] = alert.suggested_entry_high;
+    payload["suggested_stop"] = alert.suggested_stop;
+    payload["target_1"] = alert.target_1;
+    payload["target_2"] = alert.target_2;
+    payload["target_3"] = alert.target_3;
+    payload["rr_to_target_1"] = alert.rr_to_target_1;
+    payload["price"] = alert.suggested_entry_high;
+    
+    if (!default_trigger.empty()) {
+        payload["trigger"] = default_trigger;
+    } else {
+        if (alert.screen == "A") {
+            payload["trigger"] = "Intraday Mean Reversion: " + alert.news_summary;
+        } else if (alert.screen == "B") {
+            payload["trigger"] = "Swing Pullback setup found";
+        } else {
+            payload["trigger"] = "200-day MA crossover detected";
+        }
+    }
+    
+    add_position_sizes_to_payload(payload, alert);
+    
+    if (!alert.confluence_factors.empty()) {
+        payload["confluence_factors"] = alert.confluence_factors;
+    }
+    if (!alert.news_summary.empty()) {
+        payload["news_summary"] = alert.news_summary;
+    }
+    if (!alert.extra.empty()) {
+        for (auto it = alert.extra.begin(); it != alert.extra.end(); ++it) {
+            payload[it.key()] = it.value();
+        }
+    }
+    
+    return payload;
+}
+}
+
 void AlertDispatcher::calculate_position_sizes(Alert& alert) {
     double equity = 1000000.0; // Fallback 1M
     auto acc_res = broker_->get_account();
@@ -364,17 +422,7 @@ void AlertDispatcher::process_queued_alerts(std::vector<Alert>& alerts) {
                 db_a.tier = alert.tier;
                 db_a.regime_at_alert = alert.regime_at_alert;
                 
-                nlohmann::json payload;
-                payload["symbol"] = alert.symbol;
-                payload["suggested_entry_low"] = alert.suggested_entry_low;
-                payload["suggested_entry_high"] = alert.suggested_entry_high;
-                payload["suggested_stop"] = alert.suggested_stop;
-                payload["target_1"] = alert.target_1;
-                payload["target_2"] = alert.target_2;
-                payload["target_3"] = alert.target_3;
-                payload["rr_to_target_1"] = alert.rr_to_target_1;
-                payload["price"] = alert.suggested_entry_high;
-                payload["trigger"] = "Consolidation (demoted due to cluster cooldown)";
+                nlohmann::json payload = build_alert_payload(alert, "Consolidation (demoted due to cluster cooldown)");
                 db_a.payload_json = payload.dump();
                 int64_t db_id = store_->add_alert(db_a);
                 {
@@ -467,17 +515,7 @@ void AlertDispatcher::process_queued_alerts(std::vector<Alert>& alerts) {
             db_leader.tier = "premium";
             db_leader.regime_at_alert = leader.regime_at_alert;
             
-            nlohmann::json payload;
-            payload["symbol"] = leader.symbol;
-            payload["suggested_entry_low"] = leader.suggested_entry_low;
-            payload["suggested_entry_high"] = leader.suggested_entry_high;
-            payload["suggested_stop"] = leader.suggested_stop;
-            payload["target_1"] = leader.target_1;
-            payload["target_2"] = leader.target_2;
-            payload["target_3"] = leader.target_3;
-            payload["rr_to_target_1"] = leader.rr_to_target_1;
-            payload["price"] = leader.suggested_entry_high;
-            payload["trigger"] = "Collapsed cluster leader for " + cluster_id;
+            nlohmann::json payload = build_alert_payload(leader, "Collapsed cluster leader for " + cluster_id);
             db_leader.payload_json = payload.dump();
             int64_t leader_id = store_->add_alert(db_leader);
             leader.id = leader_id;
@@ -520,13 +558,7 @@ void AlertDispatcher::process_queued_alerts(std::vector<Alert>& alerts) {
                     db_member.tier = "interesting";
                     db_member.regime_at_alert = alert.regime_at_alert;
                     
-                    nlohmann::json p;
-                    p["symbol"] = alert.symbol;
-                    p["suggested_entry_low"] = alert.suggested_entry_low;
-                    p["suggested_entry_high"] = alert.suggested_entry_high;
-                    p["suggested_stop"] = alert.suggested_stop;
-                    p["price"] = alert.suggested_entry_high;
-                    p["trigger"] = "Demoted cluster member of " + cluster_id + " (leader: " + leader.symbol + ")";
+                    nlohmann::json p = build_alert_payload(alert, "Demoted cluster member of " + cluster_id + " (leader: " + leader.symbol + ")");
                     db_member.payload_json = p.dump();
                     int64_t db_id = store_->add_alert(db_member);
                     {
@@ -580,17 +612,7 @@ void AlertDispatcher::process_queued_alerts(std::vector<Alert>& alerts) {
         db_a.tier = alert.tier;
         db_a.regime_at_alert = alert.regime_at_alert;
         
-        nlohmann::json payload;
-        payload["symbol"] = alert.symbol;
-        payload["suggested_entry_low"] = alert.suggested_entry_low;
-        payload["suggested_entry_high"] = alert.suggested_entry_high;
-        payload["suggested_stop"] = alert.suggested_stop;
-        payload["target_1"] = alert.target_1;
-        payload["target_2"] = alert.target_2;
-        payload["target_3"] = alert.target_3;
-        payload["rr_to_target_1"] = alert.rr_to_target_1;
-        payload["price"] = alert.suggested_entry_high;
-        payload["trigger"] = alert.screen == "B" ? "Swing pullback setup found" : "200-day MA crossover detected";
+        nlohmann::json payload = build_alert_payload(alert);
         db_a.payload_json = payload.dump();
         
         int64_t db_id = store_->add_alert(db_a);

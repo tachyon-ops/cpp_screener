@@ -355,7 +355,23 @@ void TelegramBot::handle_callback_query(const nlohmann::json& callback) {
                             pos.alert_id = alert_id;
                             
                             auto db_inst = store_->get_instrument_by_symbol(sym);
-                            pos.instrument_id = db_inst ? db_inst->id : inst_info.saxo_uic;
+                            int64_t inst_id = 0;
+                            if (db_inst) {
+                                inst_id = db_inst->id;
+                            } else {
+                                persistence::DbInstrument inst;
+                                inst.symbol = inst_info.symbol;
+                                inst.asset_class = "Stock";
+                                inst.exchange = "Saxo";
+                                inst.saxo_uic = std::stoll(inst_info.id.native_id);
+                                inst.metadata_json = nlohmann::json({{"asset_type", inst_info.id.asset_type}}).dump();
+                                store_->add_instrument(inst);
+                                auto created = store_->get_instrument_by_symbol(sym);
+                                if (created) {
+                                    inst_id = created->id;
+                                }
+                            }
+                            pos.instrument_id = inst_id;
                             pos.direction = "long";
                             pos.entry_ts = ts;
                             pos.entry_price = entry_price > 0 ? entry_price : (payload.value("price", 100.0));

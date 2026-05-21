@@ -12,8 +12,14 @@
 #include "trader/broker/saxo_adapter.hpp"
 #include "trader/web/http_server.hpp"
 #include "trader/core/regime_classifier.hpp"
+#include "trader/core/telegram.hpp"
+#include "trader/core/alert_dispatcher.hpp"
 #include "trader/screens/screen_d.hpp"
 #include "trader/screens/screen_b.hpp"
+#include "trader/storage/time_series_store.hpp"
+#include "trader/screens/screen_a.hpp"
+#include "trader/screens/screen_e.hpp"
+#include "trader/screens/screen_f.hpp"
 #include <webview.h>
 
 
@@ -160,19 +166,198 @@ int main() {
 
     // 3.5 Initialize RegimeClassifier, ScreenD & ScreenB
     auto classifier = std::make_shared<core::RegimeClassifier>(store);
-    auto screen_d = std::make_shared<screens::ScreenD>(store);
-    auto screen_b = std::make_shared<screens::ScreenB>(store);
+
+    // Initialize Telegram Bot & Alert Dispatcher
+    auto tg_bot = std::make_shared<core::TelegramBot>(store, saxo_adapter);
+    auto dispatcher = std::make_shared<core::AlertDispatcher>(store, saxo_adapter, tg_bot);
+
+    auto ts_store = std::make_shared<storage::TimeSeriesStore>();
+    auto screen_d = std::make_shared<screens::ScreenD>(store, dispatcher);
+    auto screen_b = std::make_shared<screens::ScreenB>(store, dispatcher);
+    auto screen_a = std::make_shared<screens::ScreenA>(store, ts_store, dispatcher);
+    auto screen_e = std::make_shared<screens::ScreenE>(store, dispatcher);
+    auto screen_f = std::make_shared<screens::ScreenF>(store, dispatcher);
 
     // 4. Initialize and start HTTP & WebSocket Server
     // Serving built React files from "./ui/dist"
-    auto http_server = std::make_shared<web::HttpServer>(store, saxo_adapter, classifier, screen_d, screen_b, "./ui/dist", 8080);
+    auto http_server = std::make_shared<web::HttpServer>(store, saxo_adapter, classifier, screen_d, screen_b, screen_a, screen_e, screen_f, ts_store, "./ui/dist", 8080);
     http_server->start();
+
+    // Register callback for realtime alert propagation
+    dispatcher->set_alert_callback([http_server](const std::string& alert_json) {
+        http_server->broadcast_alert(alert_json);
+    });
+
+    // Start background threads
+    tg_bot->start();
+    dispatcher->start();
+
+    // Ensure CEF instruments are seeded
+    auto bst_opt = store->get_instrument_by_symbol("BST");
+    if (!bst_opt) {
+        persistence::DbInstrument inst;
+        inst.symbol = "BST";
+        inst.asset_class = "CEF";
+        inst.exchange = "NYSE";
+        inst.saxo_uic = 9010;
+        inst.metadata_json = "{\"asset_type\":\"Stock\",\"name\":\"BlackRock Science and Technology Trust\",\"leverage_ratio\":0.25}";
+        store->add_instrument(inst);
+        bst_opt = store->get_instrument_by_symbol("BST");
+    }
+    auto bst_nav_opt = store->get_instrument_by_symbol("BST.NAV");
+    if (!bst_nav_opt) {
+        persistence::DbInstrument inst;
+        inst.symbol = "BST.NAV";
+        inst.asset_class = "CEF_NAV";
+        inst.exchange = "NYSE";
+        inst.saxo_uic = 9011;
+        inst.metadata_json = "{\"asset_type\":\"Stock\",\"name\":\"BlackRock Science and Technology Trust NAV\"}";
+        store->add_instrument(inst);
+        bst_nav_opt = store->get_instrument_by_symbol("BST.NAV");
+    }
+    auto nvda_opt = store->get_instrument_by_symbol("NVDA");
+
+    if (bst_opt && bst_nav_opt && nvda_opt) {
+        std::cout << "[Engine] Checking/Seeding daily bars for Screen E (BST/BST.NAV) and Screen F (NVDA)..." << std::endl;
+        auto bst_bars = store->get_bars_daily(bst_opt->id);
+        auto nvda_bars = store->get_bars_daily(nvda_opt->id);
+
+        auto is_weekend_fn = [](const std::string& date_str) -> bool {
+            struct tm t = {};
+            if (sscanf(date_str.c_str(), "%d-%d-%d", &t.tm_year, &t.tm_mon, &t.tm_mday) == 3) {
+                t.tm_year -= 1900;
+                t.tm_mon -= 1;
+                mktime(&t);
+                return (t.tm_wday == 0 || t.tm_wday == 6);
+            }
+            return false;
+        };
+
+        auto get_trading_days_back_fn = [&](const std::string& start_date, int count) -> std::vector<std::string> {
+            std::vector<std::string> dates;
+            int days_offset = 0;
+            while (dates.size() < (size_t)count) {
+                std::string d = add_days(start_date, -days_offset);
+                if (!is_weekend_fn(d)) {
+                    dates.push_back(d);
+                }
+                days_offset++;
+            }
+            std::reverse(dates.begin(), dates.end());
+            return dates;
+        };
+
+        if (bst_bars.size() < 100) {
+            std::cout << "[Engine] Seeding mock historical daily bars for BST and BST.NAV..." << std::endl;
+            std::vector<std::string> dates = get_trading_days_back_fn(today_date, 100);
+            
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::normal_distribution<> pct_change(0.0001, 0.008);
+            std::uniform_real_distribution<> vol_dist(30000.0, 70000.0);
+            
+            double nav = 20.0;
+            for (size_t i = 0; i < dates.size(); ++i) {
+                double ret = pct_change(gen);
+                nav *= (1.0 + ret);
+                
+                double discount = 0.05 + 0.01 * std::sin(static_cast<double>(i) * 0.1);
+                
+                if (i == dates.size() - 1) {
+                    discount = 0.217;
+                    nav = 23.00;
+                }
+                
+                double close = nav * (1.0 - discount);
+                double open = close * (1.0 - 0.002);
+                double high = std::max(nav, close) * (1.0 + 0.003);
+                double low = std::min(nav, close) * (1.0 - 0.003);
+                double volume = vol_dist(gen);
+
+                persistence::DbBarDaily parent_bar;
+                parent_bar.instrument_id = bst_opt->id;
+                parent_bar.date = dates[i];
+                parent_bar.open = open;
+                parent_bar.high = high;
+                parent_bar.low = low;
+                parent_bar.close = close;
+                parent_bar.volume = volume;
+                store->add_bar_daily(parent_bar);
+
+                persistence::DbBarDaily nav_bar;
+                nav_bar.instrument_id = bst_nav_opt->id;
+                nav_bar.date = dates[i];
+                nav_bar.open = nav * (1.0 - 0.001);
+                nav_bar.high = nav * (1.0 + 0.001);
+                nav_bar.low = nav * (1.0 - 0.001);
+                nav_bar.close = nav;
+                nav_bar.volume = 0;
+                store->add_bar_daily(nav_bar);
+            }
+        }
+
+        if (nvda_bars.empty()) {
+            std::cout << "[Engine] Seeding mock daily bars for NVDA..." << std::endl;
+            std::vector<std::string> dates = get_trading_days_back_fn(today_date, 100);
+            
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::uniform_real_distribution<> vol_dist(40000.0, 60000.0);
+            
+            for (size_t i = 0; i < dates.size(); ++i) {
+                double open, high, low, close, volume;
+                volume = vol_dist(gen);
+                
+                if (i == dates.size() - 1) {
+                    close = 935.0;
+                    open = 922.0;
+                    high = 938.0;
+                    low = 920.5;
+                    volume = 200000.0;
+                } else if (i == 20) {
+                    high = 920.0;
+                    low = 905.0;
+                    open = 910.0;
+                    close = 912.0;
+                } else if (i == 30) {
+                    high = 820.0;
+                    low = 800.0;
+                    open = 815.0;
+                    close = 805.0;
+                } else if (i >= 79) {
+                    std::uniform_real_distribution<> price_dist(890.0, 910.0);
+                    close = price_dist(gen);
+                    open = price_dist(gen);
+                    high = std::max(open, close) + 2.0;
+                    low = std::min(open, close) - 2.0;
+                } else {
+                    std::uniform_real_distribution<> price_dist(830.0, 890.0);
+                    close = price_dist(gen);
+                    open = price_dist(gen);
+                    high = std::max(open, close) + 5.0;
+                    low = std::min(open, close) - 5.0;
+                }
+                
+                persistence::DbBarDaily bar;
+                bar.instrument_id = nvda_opt->id;
+                bar.date = dates[i];
+                bar.open = open;
+                bar.high = high;
+                bar.low = low;
+                bar.close = close;
+                bar.volume = volume;
+                store->add_bar_daily(bar);
+            }
+        }
+    }
 
     // Prime the data with an initial evaluation
     std::cout << "[Engine] Seeding/Calculating initial EOD regime and Screen D rotation board..." << std::endl;
     classifier->evaluate(today_date, 14.5, 3.25, 0.76, 520.0);
     screen_d->evaluate(today_date);
     screen_b->evaluate(today_date);
+    screen_e->evaluate(today_date);
+    screen_f->evaluate(today_date);
 
     // 5. Seed sample regime & alerts if tables are empty, so the UI is immediately wowed
     if (store->get_alerts(1).empty()) {
@@ -221,6 +406,17 @@ int main() {
         store->add_candidate(cand1);
     }
 
+    // 5.5 Pre-populate TimeSeriesStore with historical bars
+    std::cout << "[Engine] Pre-populating TimeSeriesStore with mock historical intraday bars..." << std::endl;
+    for (const auto& inst : existing_instruments) {
+        double base_price = 150.0;
+        auto daily_bars = store->get_bars_daily(inst.id);
+        if (!daily_bars.empty()) {
+            base_price = daily_bars.back().close;
+        }
+        ts_store->pre_populate(inst.symbol, base_price);
+    }
+
     // 6. Subscribe to live quotes on seeded instruments to simulate screener data feed
     std::cout << "[Engine] Connecting quote subscriptions to core screener feed..." << std::endl;
     existing_instruments = store->get_instruments();
@@ -230,7 +426,9 @@ int main() {
         id.native_id = inst.symbol; // Saxo fallback resolves on symbol keywords
         id.asset_type = inst.asset_class == "ETF" ? "Etf" : "Stock";
 
-        saxo_adapter->subscribe_quotes(id, [http_server, inst](const core::Tick& tick) {
+        saxo_adapter->subscribe_quotes(id, [http_server, inst, ts_store](const core::Tick& tick) {
+            ts_store->get_or_create(inst.symbol)->append_tick(tick);
+
             nlohmann::json tick_data;
             tick_data["symbol"] = inst.symbol;
             tick_data["instrument_id"] = inst.id;
@@ -244,7 +442,7 @@ int main() {
     }
 
     // 7. Background screener thread to periodically evaluate regimes & screens
-    std::thread screener_thread([store, http_server, classifier, screen_d, screen_b]() {
+    std::thread screener_thread([store, http_server, classifier, screen_d, screen_b, dispatcher, screen_a, screen_e, screen_f]() {
         std::random_device rd;
         std::mt19937 gen(rd());
         std::normal_distribution<> vix_walk(0.0, 0.4);
@@ -283,6 +481,9 @@ int main() {
             core::Regime regime = classifier->evaluate(date, vix, hy_oas, breadth, spy_price);
             screen_d->evaluate(date);
             screen_b->evaluate(date);
+            screen_a->evaluate(date);
+            screen_e->evaluate(date);
+            screen_f->evaluate(date);
 
             // Fetch the updated log to broadcast
             auto logs = store->get_regime_log(1);
@@ -301,64 +502,6 @@ int main() {
                     r_json["detail"] = log.detail_json;
                 }
                 http_server->broadcast_regime(r_json.dump());
-            }
-
-            // Look through Screen D results to find MA tests or crossovers to trigger real alerts
-            auto screen_results = screen_d->get_results();
-            for (const auto& res : screen_results) {
-                bool trigger_alert = false;
-                std::string trigger_reason;
-                std::string tier = "opportunity";
-                
-                if (res.cross_50_200 && (std::uniform_int_distribution<>(1, 10)(gen) <= 2)) {
-                    trigger_alert = true;
-                    trigger_reason = "50-day and 200-day MA crossover detected";
-                    tier = "premium";
-                } else if ((res.test_50ma || res.test_200ma) && (std::uniform_int_distribution<>(1, 10)(gen) <= 1)) {
-                    trigger_alert = true;
-                    trigger_reason = std::string("Price testing ") + (res.test_50ma ? "50-day" : "200-day") + " MA boundary";
-                    tier = "opportunity";
-                }
-
-                if (trigger_alert) {
-                    auto opt_inst = store->get_instrument_by_symbol(res.symbol);
-                    if (opt_inst) {
-                        persistence::DbAlert a;
-                        a.ts = get_current_utc_timestamp();
-                        a.screen = "D";
-                        a.instrument_id = opt_inst->id;
-                        a.tier = tier;
-                        
-                        nlohmann::json payload;
-                        payload["symbol"] = res.symbol;
-                        payload["price"] = res.price;
-                        payload["trigger"] = trigger_reason;
-                        payload["ma50"] = res.ma50;
-                        payload["ma200"] = res.ma200;
-                        payload["dist_50ma"] = res.dist_50ma;
-                        payload["dist_200ma"] = res.dist_200ma;
-                        payload["rs_rank"] = res.rs_rank;
-                        
-                        a.payload_json = payload.dump();
-                        a.regime_at_alert = core::regime_to_string(regime);
-                        a.acted_on = 0;
-
-                        int64_t alert_id = store->add_alert(a);
-                        a.id = alert_id;
-
-                        nlohmann::json alert_json;
-                        alert_json["id"] = a.id;
-                        alert_json["ts"] = a.ts;
-                        alert_json["screen"] = a.screen;
-                        alert_json["instrument_id"] = a.instrument_id;
-                        alert_json["tier"] = a.tier;
-                        alert_json["payload"] = payload;
-                        alert_json["regime_at_alert"] = a.regime_at_alert;
-                        alert_json["acted_on"] = a.acted_on;
-
-                        http_server->broadcast_alert(alert_json.dump());
-                    }
-                }
             }
         }
     });
@@ -402,6 +545,8 @@ int main() {
     if (screener_thread.joinable()) {
         screener_thread.join();
     }
+    dispatcher->stop();
+    tg_bot->stop();
     http_server->stop();
     std::cout << "[Engine] Shutdown complete. Goodbye." << std::endl;
     return 0;

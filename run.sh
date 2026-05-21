@@ -24,4 +24,8 @@ CPU_CORES=$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
 cmake --build build -j$CPU_CORES
 
 echo -e "${GREEN}[4/4] Launching Tachyon Trading Screener...${NC}"
+if [ -f .env ]; then
+    echo -e "${GREEN}Loading environment variables from .env...${NC}"
+    export $(grep -v '^#' .env | xargs)
+fi
 ./build/trader_engine

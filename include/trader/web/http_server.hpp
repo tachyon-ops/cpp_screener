@@ -11,9 +11,16 @@ namespace core {
     class RegimeClassifier;
 }
 
+namespace storage {
+    class TimeSeriesStore;
+}
+
 namespace screens {
     class ScreenD;
     class ScreenB;
+    class ScreenA;
+    class ScreenE;
+    class ScreenF;
 }
 
 namespace web {
@@ -26,6 +33,10 @@ public:
         std::shared_ptr<core::RegimeClassifier> classifier,
         std::shared_ptr<screens::ScreenD> screen_d,
         std::shared_ptr<screens::ScreenB> screen_b,
+        std::shared_ptr<screens::ScreenA> screen_a,
+        std::shared_ptr<screens::ScreenE> screen_e,
+        std::shared_ptr<screens::ScreenF> screen_f,
+        std::shared_ptr<storage::TimeSeriesStore> ts_store,
         const std::string& public_dir = "./ui/dist",
         int port = 8080
     );
