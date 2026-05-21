@@ -58,6 +58,14 @@ set(CROW_BUILD_EXAMPLES OFF CACHE BOOL "Build Crow examples" FORCE)
 set(CROW_BUILD_TESTS OFF CACHE BOOL "Build Crow tests" FORCE)
 FetchContent_MakeAvailable(crow)
 
+# 5. Fetch Webview
+FetchContent_Declare(
+    webview
+    GIT_REPOSITORY https://github.com/webview/webview.git
+    GIT_TAG master
+)
+FetchContent_MakeAvailable(webview)
+
 # Include directories
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -86,7 +94,9 @@ target_link_libraries(trader_engine
         nlohmann_json::nlohmann_json
         httplib::httplib
         Crow
+        webview::core
 )
 
 # Enable cpp-httplib to use OpenSSL for HTTPS and define ASIO_STANDALONE for Crow
 target_compile_definitions(trader_engine PRIVATE CPPHTTPLIB_OPENSSL_SUPPORT ASIO_STANDALONE)
+

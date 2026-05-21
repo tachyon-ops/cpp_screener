@@ -1,35 +1,26 @@
 # Tachyon Market Screener Engine
 
-A high-performance C++ market screener and alert engine combined with an embedded React + Vite SPA dashboard. The system classifies market regimes, evaluates screen rules, interacts with the Saxo Bank OpenAPI, and tracks active trading candidates in a SQLite database.
+A high-performance C++ market screener and alert engine with an **integrated native desktop GUI window** running the Vite React + Prisma UI dashboard. The system classifies market regimes, evaluates screen rules, interacts with the Saxo Bank OpenAPI, and tracks active trading candidates in a SQLite database.
 
 ## System Architecture
 
 ```
-                  ┌────────────────────────────────────────┐
-                  │       trader_engine (C++ Binary)       │
-                  │                                        │
-                  │  ┌────────────┐   ┌─────────────────┐  │
-                  │  │ SQLite DB  │   │  Saxo OpenAPI   │  │
-                  │  │ (screener) │   │ (Token Store /  │  │
-                  │  └──────┬─────┘   │  Adapter GCM)   │  │
-                  │         │         └────────┬────────┘  │
-                  │         ▼                  ▼           │
-                  │   ┌──────────────────────────────┐     │
-                  │   │   Tachyon Trader Core        │     │
-                  │   │   (Regime, Screens, Loops)   │     │
-                  │   └──────────────┬───────────────┘     │
-                  │                  ▼                     │
-                  │   ┌──────────────────────────────┐     │
-                  │   │   Crow HTTP/WS Server        │     │
-                  │   │   (Port 8080 / WS Stream)    │     │
-                  │   └──────────────┬───────────────┘     │
-                  └──────────────────┼─────────────────────┘
-                                     │ Serves assets & API
-                                     ▼
-                        ┌─────────────────────────┐
-                        │   Vite React SPA UI     │
-                        │ (Dashboard / Onboarding)│
-                        └─────────────────────────┘
+                       ┌───────────────────────────────┐
+                       │  trader_engine (Main Process) │
+                       │                               │
+                       │     Native Cocoa/WebKit GUI   │
+                       │       (Embedded Window)       │
+                       └──────────────┬────────────────┘
+                                      │ Displays UI
+                                      ▼
+           ┌─────────────────────────────────────────────────────┐
+           │            Multithreaded C++ Services               │
+           │                                                     │
+           │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐  │
+           │  │ Crow HTTP/WS │ │  SQLite DB   │ │ Saxo OpenAPI │  │
+           │  │  (Port 8080) │ │  (screener)  │ │ (AES Decrypt)│  │
+           │  └──────────────┘ └──────────────┘ └──────────────┘  │
+           └─────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -49,6 +40,7 @@ Before building, make sure you have the following installed on your system:
 ### 3. Native Libraries
 - **OpenSSL** (v1.1.1 or v3) – Required for AES-256-GCM token decryption and HTTPS client requests.
 - **SQLite3** – Required for local data storage and token persistence.
+- **macOS Cocoa & WebKit frameworks** (Included by default on macOS).
 
 ---
 
@@ -64,7 +56,7 @@ brew install cmake sqlite openssl@3
 #### On Linux (Debian/Ubuntu)
 ```bash
 sudo apt-get update
-sudo apt-get install -y build-essential cmake sqlite3 libsqlite3-dev libssl-dev pkg-config
+sudo apt-get install -y build-essential cmake sqlite3 libsqlite3-dev libssl-dev pkg-config libgtk-3-dev libwebkit2gtk-4.0-dev
 ```
 
 ### 2. Install Node Dependencies
@@ -75,48 +67,55 @@ pnpm install
 
 ---
 
-## Building the Project
+## Quick Start: Build & Run in One Command
 
-The project is structured as a monorepo containing a C++ backend and a Vite React frontend in `ui/`.
+You can build the entire monorepo (both the React frontend and the C++ desktop app) and run it with a single script:
+
+```bash
+./run.sh
+```
+
+This script:
+1. Installs/compiles the React SPA using `pnpm` workspace filters.
+2. Generates the CMake configuration in the `build/` folder.
+3. Compiles the C++ engine utilizing all available CPU cores.
+4. Executes `./build/trader_engine`.
+
+---
+
+## Manual Building (Step-by-Step)
+
+If you prefer to compile the frontend and C++ engine separately:
 
 ### Step 1: Build the React Frontend
-Build the frontend static assets so they can be served by the C++ engine:
 ```bash
 pnpm --filter ui build
 ```
-This will compile TypeScript, bundle components, and output the production build to [ui/dist](file:///Users/nunoribeiro/repos/cpp_screener/ui/dist).
+This outputs the compiled assets to [ui/dist](file:///Users/nunoribeiro/repos/cpp_screener/ui/dist).
 
-### Step 2: Build the C++ Backend
-Generate the build files and compile the C++ `trader_engine` executable:
+### Step 2: Build the C++ Backend & GUI
 ```bash
-# Generate build configuration
+# Generate build configuration inside build/
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 
-# Build the executable (using 4 parallel jobs)
+# Compile the binary
 cmake --build build -j4
 ```
-This outputs the compiled executable to `build/trader_engine`.
 
 ---
 
 ## Running the Application
 
-### 1. Verify Configuration Databases
-Ensure your databases are in place:
-- **Screener Store**: State, alerts, and candidate configurations will be managed at `./data/screener.db`.
-- **Token Store**: Your encrypted Saxo credentials database should reside at `./data/tokens.db`.
+### 1. Verify Databases
+Ensure the databases exist inside the `data/` directory:
+- **Screener Store**: `./data/screener.db`
+- **Token Store**: `./data/tokens.db`
 
-### 2. Launch the Engine
-Start the compiled engine binary:
+### 2. Launch the Engine Manually
 ```bash
 ./build/trader_engine
 ```
 
-The system will:
-1. Decrypt your Saxo tokens from `./data/tokens.db` (falling back to simulated quotes if credentials are empty or invalid).
-2. Initialize or verify the SQLite tables in `./data/screener.db`.
-3. Startup the screener loop thread.
-4. Launch the Crow web server on **Port 8080**.
-
-### 3. Open the Dashboard
-Navigate to `http://localhost:8080` in your web browser. You should see the glassmorphic dark-finance dashboard displaying real-time market regimes, active screens, alerts, and the trading candidate onboarding form.
+#### Execution Modes:
+- **GUI Desktop Mode (Default)**: On machines with a display server (e.g. macOS or local Linux/Windows desktop), a native application window launches, loading the dashboard UI directly. Closing the window gracefully terminates the background screener.
+- **Headless Daemon Mode**: If run in an environment without a display server (e.g. a remote cloud droplet VM), the application automatically detects the absence of a display, bypasses GUI initialization, and runs as a headless background service (accessible via `http://<your-ip>:8080` in an external browser).

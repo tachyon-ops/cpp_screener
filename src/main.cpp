@@ -11,6 +11,8 @@
 #include "trader/persistence/sqlite_store.hpp"
 #include "trader/broker/saxo_adapter.hpp"
 #include "trader/web/http_server.hpp"
+#include <webview.h>
+
 
 using namespace trader;
 
@@ -237,10 +239,39 @@ int main() {
         }
     });
 
-    // 8. Block main thread until shutdown signal
-    while (run_engine) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    // 8. Block main thread until shutdown signal, or run webview if supported/enabled
+    bool gui_enabled = true;
+    
+    // Check environment variable on Linux for headless setup
+#if defined(__linux__)
+    if (std::getenv("DISPLAY") == nullptr && std::getenv("WAYLAND_DISPLAY") == nullptr) {
+        gui_enabled = false;
     }
+#endif
+
+    if (gui_enabled) {
+        try {
+            std::cout << "[Engine] Opening native GUI window..." << std::endl;
+            webview::webview w(true, nullptr);
+            w.set_title("Tachyon Trading Dashboard");
+            w.set_size(1400, 900, WEBVIEW_HINT_NONE);
+            w.navigate("http://localhost:8080");
+            w.run();
+            // When window is closed:
+            run_engine = false;
+        } catch (const std::exception& e) {
+            std::cerr << "[Engine] GUI window failed to start: " << e.what() << ". Falling back to headless mode..." << std::endl;
+            gui_enabled = false;
+        }
+    }
+
+    if (!gui_enabled) {
+        std::cout << "[Engine] Running in headless mode. Press Ctrl+C to terminate." << std::endl;
+        while (run_engine) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        }
+    }
+
 
     // 9. Cleanup and graceful shutdown
     std::cout << "[Engine] Shutting down background components..." << std::endl;
