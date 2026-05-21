@@ -21,7 +21,7 @@ is a deliberate dependency from a higher-level package to a lower-level one.
 
 | Stack | Unit of isolation | Public surface | Internal surface |
 |---|---|---|---|
-| C++ | Internal library / target | Public headers in `include/trader/<lib>/` | `src/<lib>/` private headers |
+| C++ | Internal library / target | Public headers in `include/trader/module_name/` | `src/module_name/` private headers |
 
 The unit, syntax, and tooling change. The discipline does not.
 

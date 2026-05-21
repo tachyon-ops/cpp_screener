@@ -7,6 +7,7 @@
 #include <random>
 #include <iomanip>
 #include <sstream>
+#include <nlohmann/json.hpp>
 #include "trader/persistence/sqlite_store.hpp"
 #include "trader/broker/saxo_adapter.hpp"
 #include "trader/web/http_server.hpp"

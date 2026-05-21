@@ -3,13 +3,13 @@ name: prisma-ui
 description: >
   How to consume the PRISMA UI library in a project that includes it as
   a git submodule. Defines: how PRISMA is wired into the workspace,
-  token-first styling discipline, the project-side `ui-domain` package
+  token-first styling discipline, the project-side component customisation
   pattern for trading-domain or other domain primitives that are
   candidates for upstreaming into PRISMA, the component file structure,
   variant discipline via `cva`, and the rule that submodule files are
   never edited from the consuming project. Load before adding or
   modifying any UI component, any styling, any component that consumes
-  PRISMA primitives, or anything in a `@<project>/ui-domain` package.
+  PRISMA primitives, or anything in the ui/ components.
   Repo: git@github.com:tachyon-ops/prisma.git.
 ---
 
@@ -50,19 +50,18 @@ core promises:
 ## How PRISMA Is Wired In
 
 PRISMA lives at `git@github.com:tachyon-ops/prisma.git` and is included
-in this project as a git submodule. The wiring (record concrete paths
-in `codebase-map`):
+in this project as a git submodule. The wiring:
 
 ```
-<repo-root>/
+cpp_screener/
 ├── .gitmodules                     ← declares the submodule
-├── vendor/prisma/                  ← submodule checkout (path may differ; see codebase-map)
+├── vendor/prisma/                  ← submodule checkout
 │   ├── packages/ui/                ← the @prisma/ui package source
 │   └── ...
-├── pnpm-workspace.yaml             ← lists vendor/prisma/packages/ui as a workspace member
-└── apps/<app>/
+├── pnpm-workspace.yaml             ← lists vendor/prisma/packages/ui and ui/ as workspace members
+└── ui/
     ├── package.json                ← declares "@prisma/ui": "workspace:*"
-    └── next.config.ts              ← includes "@prisma/ui" in transpilePackages
+    └── vite.config.ts              ← Vite configuration for serving React app
 ```
 
 The discipline:
@@ -72,9 +71,7 @@ The discipline:
 2. **Pinned commit.** The submodule is pinned to a specific commit in
    the parent repo's history. CI clones with
    `git submodule update --init --recursive`.
-3. **`transpilePackages`.** Bundler configs (Next.js, Vite, etc.) must
-   include `@prisma/ui` in their transpile list — otherwise the
-   workspace source is shipped untranspiled.
+3. **Bundler Integration.** Vite compiles `@prisma/ui` because it resolves the workspace source directly.
 
 ---
 
@@ -101,35 +98,25 @@ instruction.
 
 ---
 
-## The `ui-domain` Pattern
+## The Component Customization Pattern
 
 This project will have UI needs that are too domain-specific to live
 in PRISMA today, but may belong there tomorrow. The pattern for these
-is a project-side package that follows PRISMA conventions exactly.
+is a project-side folder `ui/src/components/` that follows PRISMA conventions exactly.
 
 Typical layout:
 
 ```
-packages/<project>-ui-domain/        ← e.g. @<project>/ui-domain
-├── package.json
-├── tsconfig.json
-├── README.md
-└── src/
-    ├── index.ts
-    ├── utils/
-    │   └── cn.ts                    ← class-name composer (clsx wrapper)
-    └── primitives/
-        └── <ComponentName>/
-            ├── <ComponentName>.tsx
-            ├── <ComponentName>.types.ts
-            ├── <ComponentName>.stories.tsx
-            ├── <ComponentName>.test.tsx
-            └── index.ts
+ui/src/components/
+└── TradeCard/
+    ├── TradeCard.tsx
+    ├── TradeCard.types.ts
+    ├── TradeCard.stories.tsx
+    ├── TradeCard.test.tsx
+    └── index.ts
 ```
 
-`@<project>/ui-domain` declares `@prisma/ui` as a `workspace:*`
-dependency and composes its primitives from PRISMA atoms and molecules.
-The package's purpose is to be a holding area for components that:
+These components declare `@prisma/ui` dependencies and compose their primitives from PRISMA atoms and molecules. They:
 
 - Use the same tokens as PRISMA.
 - Use the same `cva` variant patterns as PRISMA.
@@ -137,41 +124,37 @@ The package's purpose is to be a holding area for components that:
 - Are written with the explicit intent of being upstreamable to PRISMA
   when the API stabilises and the use case is general enough.
 
-When a component in `ui-domain` matures, the upstreaming work is:
+When a component matures, the upstreaming work is:
 
 ```
 1. Move the component into the PRISMA repository, in the appropriate
    atoms/molecules/organisms tier.
 2. Add its Storybook stories there.
 3. Bump the submodule pin in the parent repo (human instruction).
-4. Replace the import in the consuming code: from @<project>/ui-domain
-   to @prisma/ui.
-5. Remove the component from @<project>/ui-domain.
+4. Replace the import in the consuming code from local components to @prisma/ui.
+5. Remove the component from ui/src/components/.
 ```
 
 This pattern means the agent has a clear answer to "where does this
 new component go": if it is general, propose it for PRISMA; if it is
-project-specific but PRISMA-shaped, put it in `ui-domain`; if it is
+project-specific but PRISMA-shaped, put it in `ui/src/components/`; if it is
 truly app-specific, it lives inside the app.
-
----
 
 ## Component File Structure
 
-Every component — in PRISMA, in `ui-domain`, and (where it warrants
-the ceremony) in the app — follows this layout:
+Every component — in PRISMA or local custom components — follows this layout (using `TradeCard` as an example):
 
 ```
-<ComponentName>/
-├── <ComponentName>.tsx           ← the React component
-├── <ComponentName>.types.ts      ← public prop types and variants
-├── <ComponentName>.stories.tsx   ← Storybook stories (at least Default + AllStates + Playground)
-├── <ComponentName>.test.tsx      ← render + a11y tests
-├── index.ts                      ← barrel re-export
-└── README.md                     ← (optional) prop docs and token usage
+TradeCard/
+├── TradeCard.tsx           ← the React component
+├── TradeCard.types.ts      ← public prop types and variants
+├── TradeCard.stories.tsx   ← Storybook stories (at least Default + AllStates + Playground)
+├── TradeCard.test.tsx      ← render + a11y tests
+├── index.ts                ← barrel re-export
+└── README.md               ← (optional) prop docs and token usage
 ```
 
-When the component is in `ui-domain` and intended for upstreaming, the
+When the component is local and intended for upstreaming, the
 stories file carries a header marker:
 
 ```tsx
@@ -287,16 +270,14 @@ agent reads `codebase-map` for which themes this project enables.
 The agent does **not** invent new themes in consuming projects. New
 themes are a PRISMA concern.
 
----
-
 ## Storybook in the Consuming Project
 
 If the project ships its own Storybook (separate from PRISMA's), it
-imports from `@prisma/ui` and `@<project>/ui-domain` for the stories
+imports from `@prisma/ui` and local custom components for the stories
 it owns. PRISMA's stories live in the PRISMA repo and ship through
 the PRISMA submodule's own Storybook target.
 
-If a `ui-domain` component carries a `// COPY TO PRISMA WHEN UPSTREAMED.`
+If a local component carries a `// COPY TO PRISMA WHEN UPSTREAMED.`
 marker, its stories file is structured to be moved into PRISMA's
 Storybook as-is when the upstreaming happens.
 
@@ -314,9 +295,9 @@ Storybook as-is when the upstreaming happens.
   Surface the need; the work happens in the PRISMA repo.
 - **Bumping the submodule pin without explicit human instruction.**
 - **Adding a UI primitive directly inside an app** when its shape is
-  general enough to live in `ui-domain` or PRISMA.
+  general enough to belong in PRISMA.
 - **Forking PRISMA components** by copy-pasting their source into the
-  project. If the fork is needed, it is either a `ui-domain` extension
+  project. If the fork is needed, it is either a local extension
   or a PRISMA change. Never a copy.
 
 ---
@@ -326,7 +307,7 @@ Storybook as-is when the upstreaming happens.
 - Read `codebase-map` for the exact submodule path, the workspace
   layout, and the list of themes this project uses.
 - Before writing a component: decide where it goes — PRISMA (propose,
-  do not edit), `ui-domain`, or app-local. Justify the placement.
+  do not edit) or ui-local. Justify the placement.
 - Use PRISMA primitives and tokens for every visual concern. No raw
   literals.
 - Follow the file structure (`.tsx`, `.types.ts`, `.stories.tsx`,
@@ -345,8 +326,7 @@ Refuse a change, and surface, when:
 - A raw hex code or pixel value would be introduced in a component.
 - A component is being copy-pasted from PRISMA rather than consumed.
 - A new theme would be defined outside PRISMA.
-- A UI primitive that should live in `ui-domain` is being added
-  directly inside an app.
+- A UI primitive that should be in PRISMA is being added ad-hoc.
 
 ---
 

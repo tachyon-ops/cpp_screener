@@ -241,6 +241,46 @@ HttpServer::HttpServer(
         }
     });
 
+    // 4b. POST /api/candidates
+    CROW_ROUTE(pimpl_->app, "/api/candidates").methods(crow::HTTPMethod::POST)([this](const crow::request& req) {
+        try {
+            auto body = nlohmann::json::parse(req.body);
+            std::string symbol = body.at("symbol").get<std::string>();
+            
+            auto inst_opt = pimpl_->store->get_instrument_by_symbol(symbol);
+            if (!inst_opt.has_value()) {
+                nlohmann::json err = {{"error", "Instrument symbol not found: " + symbol}};
+                return crow::response(400, err.dump());
+            }
+            
+            persistence::DbCandidate cand;
+            auto now = std::chrono::system_clock::now();
+            auto time = std::chrono::system_clock::to_time_t(now);
+            std::stringstream ss;
+            ss << std::put_time(std::gmtime(&time), "%Y-%m-%dT%H:%M:%SZ");
+            cand.created_ts = ss.str();
+            
+            cand.screen = body.value("screen", "B");
+            cand.instrument_id = inst_opt->id;
+            cand.entry_zone_low = std::stod(body.at("entry_zone_low").get<std::string>());
+            cand.entry_zone_high = std::stod(body.at("entry_zone_high").get<std::string>());
+            cand.suggested_stop = std::stod(body.at("suggested_stop").get<std::string>());
+            cand.rr_target = std::stod(body.value("rr_target", "3.0"));
+            cand.notes = body.value("notes", "");
+            cand.status = "active";
+            
+            int64_t new_id = pimpl_->store->add_candidate(cand);
+            
+            nlohmann::json res;
+            res["status"] = "success";
+            res["id"] = new_id;
+            return crow::response(200, res.dump());
+        } catch (const std::exception& e) {
+            nlohmann::json err = {{"error", e.what()}};
+            return crow::response(500, err.dump());
+        }
+    });
+
     // 5. GET /api/instruments
     CROW_ROUTE(pimpl_->app, "/api/instruments")([this]() {
         try {

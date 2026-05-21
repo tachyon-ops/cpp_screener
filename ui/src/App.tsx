@@ -217,11 +217,39 @@ function App() {
       return;
     }
 
-    // Since we don't have a direct candidates write REST endpoint, we can expand it
-    // Or we can mock the candidate local array or submit it. In this case, we'll implement it
-    // but keep local persistence as fallback.
-    showToast(`Setup Candidate created for ${candSymbol}`, 'success');
-    setShowCandForm(false);
+    try {
+      const response = await fetch('/api/candidates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol: candSymbol.toUpperCase(),
+          screen: candScreen,
+          entry_zone_low: candLow,
+          entry_zone_high: candHigh,
+          suggested_stop: candStop,
+          rr_target: candRR,
+          notes: candNotes
+        })
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        showToast(`Setup Candidate created for ${candSymbol.toUpperCase()}`, 'success');
+        setShowCandForm(false);
+        // Clear fields
+        setCandSymbol('');
+        setCandLow('');
+        setCandHigh('');
+        setCandStop('');
+        setCandRR('3.0');
+        setCandNotes('');
+        fetchData();
+      } else {
+        showToast(data.error || 'Failed to create candidate', 'error');
+      }
+    } catch (err) {
+      showToast('Network error creating candidate', 'error');
+    }
   };
 
   const getRegimeColor = (state: string) => {

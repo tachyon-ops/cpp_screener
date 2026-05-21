@@ -95,15 +95,15 @@ thing. Test through the public surface.
 ### The Arrange-Act-Assert shape
 
 ```
-# Arrange — set up inputs and dependencies
-order = make_order(lines=[line(price=10), line(price=20)])
-discount = Discount(percent=Decimal("0.1"))
+// Arrange — set up inputs and dependencies
+Order order = make_order({Line(10.0), Line(20.0)});
+double discount_percent = 0.1;
 
-# Act — call the thing under test
-total = compute_order_total(order.lines, discount.percent)
+// Act — call the thing under test
+double total = compute_order_total(order.lines, discount_percent);
 
-# Assert — check the contract
-assert total == Money("27.00")
+// Assert — check the contract
+EXPECT_DOUBLE_EQ(total, 27.00);
 ```
 
 Three sections, in order. No conditionals, no loops, no try/except in

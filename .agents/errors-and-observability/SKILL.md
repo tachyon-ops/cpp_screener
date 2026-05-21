@@ -37,28 +37,19 @@ for control flow. Both ends suffer.
 
 The signature tells the caller what can go wrong.
 
-```rust
+```cpp
 // Good — failure is part of the contract.
-pub fn charge_card(card: &Card, amount: Money) -> Result<ChargeId, ChargeError>
-
-pub enum ChargeError {
-    CardDeclined { reason: DeclineReason },
+enum class ChargeError {
+    CardDeclined,
     InsufficientFunds,
     InvalidCard,
-    GatewayUnavailable,  // transient — caller may retry
-}
-```
+    GatewayUnavailable  // transient — caller may retry
+};
 
-```typescript
-// Good — failure is part of the contract.
-type Result<T, E> = { ok: true; value: T } | { ok: false; error: E };
+Result<ChargeId, ChargeError> charge_card(const Card& card, Money amount);
 
-function chargeCard(card: Card, amount: Money): Promise<Result<ChargeId, ChargeError>>;
-```
-
-```python
-# Good — failure is part of the contract (using a Result type or sentinel).
-def find_user(email: str) -> User | None: ...
+// Good — std::optional for simple not-found sentinel
+std::optional<User> find_user(const std::string& email);
 ```
 
 The caller is forced to handle the failure path, or to explicitly

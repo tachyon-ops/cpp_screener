@@ -49,32 +49,37 @@ For every third-party API:
 
 Example:
 
-```typescript
-// Port — owned by your code. Domain terminology.
-export interface PaymentGateway {
-  charge(amount: Money, source: PaymentSource): Promise<Result<ChargeId, ChargeError>>;
-  refund(charge: ChargeId, amount?: Money): Promise<Result<RefundId, RefundError>>;
-}
+```cpp
+// Port — owned by your code (domain interface).
+class BrokerAdapter {
+public:
+    virtual ~BrokerAdapter() = default;
+    virtual Result<InstrumentInfo, BrokerError> lookup_symbol(const std::string& sym) = 0;
+    virtual Result<void, BrokerError> refund(ChargeId charge, std::optional<Money> amount) = 0;
+};
 
-// Adapter — only file that knows about Stripe.
-export class StripePaymentGateway implements PaymentGateway {
-  async charge(amount: Money, source: PaymentSource) {
-    // Third-party APIs:
-    //   - Stripe Node SDK: stripe.paymentIntents.create
-    //     docs: https://stripe.com/docs/api/payment_intents/create
-    //     auth: STRIPE_SECRET_KEY from env
-    //     rate limits: 100 req/s (live), 25 req/s (test)
-    //     failure modes handled: card_declined, insufficient_funds,
-    //                            rate_limit, api_connection, api_error
-    try {
-      const intent = await this.stripe.paymentIntents.create({...});
-      return Ok(ChargeId.from(intent.id));
-    } catch (e) {
-      return Err(translateStripeError(e));
+// Adapter — only component that knows about Saxo OpenAPI.
+class SaxoBrokerAdapter : public BrokerAdapter {
+public:
+    Result<InstrumentInfo, BrokerError> lookup_symbol(const std::string& sym) override {
+        // Third-party APIs:
+        //   - Saxo OpenAPI: GET /ref/v1/instruments?Keywords={sym}
+        //     docs: https://www.developer.saxo/openapi/referencedocs/ref/v1/instruments
+        //     auth: OAuth2 bearer token from TokenStore
+        //     rate limits: 60 req/m
+        //     failure modes handled: 401 (needs refresh), 429 (rate limit), 5xx
+        try {
+            auto response = http_client_.get("/ref/v1/instruments?Keywords=" + sym);
+            if (response.status == 200) {
+                return Ok(parse_instrument(response.body));
+            }
+            return Err(translate_saxo_error(response));
+        } catch (const std::exception& e) {
+            return Err(BrokerError::ConnectionFailed);
+        }
     }
-  }
-  ...
-}
+    // ...
+};
 ```
 
 The domain code calls `gateway.charge(...)` and knows nothing about
@@ -96,17 +101,18 @@ The block lists, for each external dependency the function touches:
 - **Known failure modes handled** (and any deliberately not handled)
 - **Rate limits or quotas relevant to this call**
 
-```python
-def fetch_account_balance(account_id: AccountId, client: SaxoClient) -> Result[Balance, FetchError]:
-    # Third-party APIs:
-    #   - Saxo OpenAPI: GET /port/v1/balances?ClientKey={key}
-    #     docs: https://www.developer.saxo/openapi/referencedocs/port/v1/balances
-    #     auth: OAuth2 bearer token from SaxoTokenStore
-    #     rate limit: 240 requests / minute per app
-    #     failure modes handled: 401 (token expired -> refresh),
-    #                            429 (rate limited -> backoff),
-    #                            5xx (transient -> retry with jitter)
+```cpp
+Result<Balance, FetchError> fetch_account_balance(AccountId account_id, SaxoClient& client) {
+    // Third-party APIs:
+    //   - Saxo OpenAPI: GET /port/v1/balances?ClientKey={key}
+    //     docs: https://www.developer.saxo/openapi/referencedocs/port/v1/balances
+    //     auth: OAuth2 bearer token from SaxoTokenStore
+    //     rate limit: 240 requests / minute per app
+    //     failure modes handled: 401 (token expired -> refresh),
+    //                            429 (rate limited -> backoff),
+    //                            5xx (transient -> retry with jitter)
     ...
+}
 ```
 
 Why this is non-negotiable:

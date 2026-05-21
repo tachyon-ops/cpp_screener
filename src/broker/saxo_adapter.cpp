@@ -184,7 +184,7 @@ struct SaxoBrokerAdapter::Impl {
         if (method == "GET") {
             res = cli.Get(full_path, headers);
         } else if (method == "POST") {
-            headers["Content-Type"] = "application/json";
+            headers.emplace("Content-Type", "application/json");
             res = cli.Post(full_path, headers, body.is_null() ? "" : body.dump(), "application/json");
         } else if (method == "DELETE") {
             res = cli.Delete(full_path, headers);
@@ -359,7 +359,7 @@ Result<std::vector<Bar>> SaxoBrokerAdapter::get_bars(
                 std::tm tm = {};
                 std::stringstream ss(time_str);
                 ss >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
-                auto tp = std::chrono::system_clock::from_time_t(std::timegm(&tm));
+                auto tp = std::chrono::system_clock::from_time_t(timegm(&tm));
                 b.ts.ms_since_epoch = std::chrono::duration_cast<std::chrono::milliseconds>(tp.time_since_epoch()).count();
 
                 b.open.value = item["Open"].get<double>();

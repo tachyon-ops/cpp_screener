@@ -75,7 +75,7 @@ struct Result {
     T value() const { return std::get<0>(data); }
     E error() const { return std::get<1>(data); }
     
-    static Result ok(T v) { Result r; r.data = std::move(v); return r; }
+    static Result ok(T v) { Result r; r.data = std::variant<T, E>(std::in_place_index<0>, std::move(v)); return r; }
     static Result err(E e) { Result r; r.data = std::variant<T, E>(std::in_place_index<1>, std::move(e)); return r; }
 };
 

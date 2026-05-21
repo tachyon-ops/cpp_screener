@@ -88,14 +88,11 @@ Three stability tiers, declared explicitly in docs or via tooling:
 
 Mark unstable APIs explicitly:
 
-```ts
-/** @experimental May change without notice. */
-export function newThing(...) {}
-```
-
-```rust
-#[doc(hidden)]
-pub fn experimental_thing() {}
+```cpp
+/**
+ * @brief [Experimental] May change without notice.
+ */
+void new_thing(...);
 ```
 
 ---
@@ -152,20 +149,23 @@ Every public symbol has a docstring that covers:
 4. **Outputs** — including all failure modes.
 5. **Side effects** — if any.
 
-```python
-def transfer_funds(from_id: AccountId, to_id: AccountId, amount: Money) -> Result[TransferId, TransferError]:
-    """Transfer `amount` between two accounts, atomically.
-
-    Use this when both accounts are in the same ledger. For cross-ledger
-    transfers use `cross_ledger.initiate_transfer`.
-
-    `amount` must be positive and in the same currency as both accounts.
-    Returns the transfer ID on success, or a `TransferError` indicating
-    insufficient funds, account frozen, or ledger mismatch.
-
-    Side effects: writes one row to `transfers`, updates two rows in
-    `accounts`, emits a `TransferCompleted` event.
-    """
+```cpp
+/**
+ * @brief Transfer @p amount between two accounts, atomically.
+ * 
+ * Use this when both accounts are in the same ledger. For cross-ledger
+ * transfers use cross_ledger::initiate_transfer.
+ * 
+ * @param from_id Source account ID.
+ * @param to_id Destination account ID.
+ * @param amount Amount to transfer (must be positive).
+ * @return Result containing TransferId on success, or TransferError indicating
+ *         insufficient funds, account frozen, or ledger mismatch.
+ * 
+ * @note Side effects: writes one row to transfers, updates two rows in
+ *       accounts, emits a TransferCompleted event.
+ */
+Result<TransferId, TransferError> transfer_funds(AccountId from_id, AccountId to_id, Money amount);
 ```
 
 ---

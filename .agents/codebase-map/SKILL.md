@@ -44,7 +44,7 @@ cpp_screener/
 | Ports (interfaces for I/O) | `include/trader/broker/` | `abstract_interface.hpp` |
 | Adapters (Port implementations) | `src/broker/` | `snake_case.cpp` |
 | HTTP / API endpoints | `src/web/` | `snake_case.cpp` |
-| Screen logic | `src/screens/` | `screen_<id>_<name>.cpp` |
+| Screen logic | `src/screens/` | `screen_id_name.cpp` |
 | Regime classification | `src/regime/` | `snake_case.cpp` |
 | Database store / schemas | `src/persistence/` | `snake_case.cpp` |
 | Configuration | `config/` | `*.yaml` or `*.env` |

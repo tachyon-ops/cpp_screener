@@ -85,7 +85,7 @@ target_link_libraries(trader_engine
         OpenSSL::Crypto
         nlohmann_json::nlohmann_json
         httplib::httplib
-        crow
+        Crow
 )
 
 # Enable cpp-httplib to use OpenSSL for HTTPS and define ASIO_STANDALONE for Crow

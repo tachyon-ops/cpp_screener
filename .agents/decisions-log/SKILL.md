@@ -91,11 +91,11 @@ Every ADR follows this structure. Keep it short — usually under one
 page.
 
 ```markdown
-# ADR-NNNN: <Short Title>
+# ADR-NNNN: Short Title
 
 - **Status:** Proposed | Accepted | Superseded by ADR-MMMM | Deprecated
 - **Date:** YYYY-MM-DD
-- **Deciders:** <names or roles>
+- **Deciders:** Decider Name or Role
 
 ## Context
 
