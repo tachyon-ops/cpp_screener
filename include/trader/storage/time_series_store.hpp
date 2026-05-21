@@ -36,6 +36,8 @@ private:
 
     core::CircularBuffer<core::Bar> daily_;
     core::CircularBuffer<core::Bar> hourly_;
+    core::CircularBuffer<core::Bar> h4_;
+    core::CircularBuffer<core::Bar> w1_;
     core::CircularBuffer<core::Bar> min5_;
     core::CircularBuffer<core::Bar> min1_;
     core::CircularBuffer<core::Tick> ticks_;

@@ -156,7 +156,7 @@ const alertsFlow = addKeyword<BaileysProvider, MemoryDB>(['/alerts'])
         }
     });
 
-const actFlow = addKeyword<BaileysProvider, MemoryDB>(/^\/act\s+(\d+)$/, { regex: true })
+const actFlow = addKeyword<BaileysProvider, MemoryDB>('/^\\\\/act\\\\s+(\\\\d+)$/', { regex: true })
     .addAction(async (ctx, { flowDynamic }) => {
         if (!(await isAuthorized(ctx.from))) return;
         const match = ctx.body.match(/^\/act\s+(\d+)$/);
@@ -183,7 +183,7 @@ const actFlow = addKeyword<BaileysProvider, MemoryDB>(/^\/act\s+(\d+)$/, { regex
         }
     });
 
-const skipFlow = addKeyword<BaileysProvider, MemoryDB>(/^\/skip\s+(\d+)$/, { regex: true })
+const skipFlow = addKeyword<BaileysProvider, MemoryDB>('/^\\\\/skip\\\\s+(\\\\d+)$/', { regex: true })
     .addAction(async (ctx, { flowDynamic }) => {
         if (!(await isAuthorized(ctx.from))) return;
         const match = ctx.body.match(/^\/skip\s+(\d+)$/);

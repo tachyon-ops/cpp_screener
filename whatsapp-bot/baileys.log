@@ -1,0 +1,16 @@
+[2026-05-21T23:41:13.723Z] Connection update: connecting
+[2026-05-21T23:42:49.067Z] Connection update: connecting
+[2026-05-21T23:44:58.262Z] Connection update: connecting
+[2026-05-21T23:44:58.697Z] Connection update: close
+[2026-05-21T23:44:58.697Z] Connection closed. Status: 405, Reason: Connection Failure
+[2026-05-21T23:44:58.698Z] Critical error, stopping reconnection attempts
+[2026-05-21T23:49:37.312Z] Uncaught Exception: [Error: ENOENT: no such file or directory, open '/Users/nunoribeiro/repos/cpp_screener/whatsapp-bot/bot.qr.png'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/nunoribeiro/repos/cpp_screener/whatsapp-bot/bot.qr.png'
+}
+[2026-05-21T23:50:02.248Z] Connection update: connecting
+[2026-05-21T23:50:03.470Z] Connection update: close
+[2026-05-21T23:50:03.470Z] Connection closed. Status: 405, Reason: Connection Failure
+[2026-05-21T23:50:03.470Z] Critical error, stopping reconnection attempts

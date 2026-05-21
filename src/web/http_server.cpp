@@ -5,6 +5,8 @@
 #include "trader/screens/screen_a.hpp"
 #include "trader/screens/screen_e.hpp"
 #include "trader/screens/screen_f.hpp"
+#include "trader/screens/screen_g.hpp"
+#include "trader/screens/screen_c.hpp"
 #include "trader/storage/time_series_store.hpp"
 #include <crow.h>
 #include <nlohmann/json.hpp>
@@ -27,6 +29,8 @@ struct HttpServer::Impl {
     std::shared_ptr<screens::ScreenA> screen_a;
     std::shared_ptr<screens::ScreenE> screen_e;
     std::shared_ptr<screens::ScreenF> screen_f;
+    std::shared_ptr<screens::ScreenG> screen_g;
+    std::shared_ptr<screens::ScreenC> screen_c;
     std::shared_ptr<storage::TimeSeriesStore> ts_store;
     std::string public_dir;
     int port;
@@ -45,10 +49,12 @@ struct HttpServer::Impl {
         std::shared_ptr<screens::ScreenA> sa,
         std::shared_ptr<screens::ScreenE> se,
         std::shared_ptr<screens::ScreenF> sf,
+        std::shared_ptr<screens::ScreenG> sg,
+        std::shared_ptr<screens::ScreenC> sc,
         std::shared_ptr<storage::TimeSeriesStore> ts,
         std::string dir,
         int p
-    ) : store(std::move(s)), broker(std::move(b)), classifier(std::move(c)), screen_d(std::move(sd)), screen_b(std::move(sb)), screen_a(std::move(sa)), screen_e(std::move(se)), screen_f(std::move(sf)), ts_store(std::move(ts)), public_dir(std::move(dir)), port(p) {}
+    ) : store(std::move(s)), broker(std::move(b)), classifier(std::move(c)), screen_d(std::move(sd)), screen_b(std::move(sb)), screen_a(std::move(sa)), screen_e(std::move(se)), screen_f(std::move(sf)), screen_g(std::move(sg)), screen_c(std::move(sc)), ts_store(std::move(ts)), public_dir(std::move(dir)), port(p) {}
 
     void broadcast(const std::string& text) {
         std::lock_guard<std::mutex> lock(ws_mutex);
@@ -111,10 +117,12 @@ HttpServer::HttpServer(
     std::shared_ptr<screens::ScreenA> screen_a,
     std::shared_ptr<screens::ScreenE> screen_e,
     std::shared_ptr<screens::ScreenF> screen_f,
+    std::shared_ptr<screens::ScreenG> screen_g,
+    std::shared_ptr<screens::ScreenC> screen_c,
     std::shared_ptr<storage::TimeSeriesStore> ts_store,
     const std::string& public_dir,
     int port
-) : pimpl_(std::make_unique<Impl>(std::move(store), std::move(broker), std::move(classifier), std::move(screen_d), std::move(screen_b), std::move(screen_a), std::move(screen_e), std::move(screen_f), std::move(ts_store), public_dir, port)) {
+) : pimpl_(std::make_unique<Impl>(std::move(store), std::move(broker), std::move(classifier), std::move(screen_d), std::move(screen_b), std::move(screen_a), std::move(screen_e), std::move(screen_f), std::move(screen_g), std::move(screen_c), std::move(ts_store), public_dir, port)) {
 
     // Define REST Endpoints
 
@@ -281,6 +289,47 @@ HttpServer::HttpServer(
                     } else {
                         res["message"] = "DB response added but symbol is empty in payload.";
                     }
+
+                    // Insert position record
+                    persistence::DbPosition pos;
+                    pos.alert_id = alert_id;
+                    pos.instrument_id = target_alert.instrument_id;
+                    pos.direction = "long";
+                    if (payload.contains("direction")) {
+                        try {
+                            pos.direction = payload["direction"].get<std::string>();
+                        } catch (...) {}
+                    }
+                    pos.entry_ts = resp.response_ts;
+                    pos.entry_price = price;
+                    pos.size = units;
+
+                    double stop_lvl = 0.0;
+                    if (payload.contains("suggested_stop")) {
+                        try {
+                            stop_lvl = payload["suggested_stop"].get<double>();
+                        } catch (...) {}
+                    } else if (payload.contains("stop")) {
+                        try {
+                            stop_lvl = payload["stop"].get<double>();
+                        } catch (...) {}
+                    }
+                    if (stop_lvl <= 0.0) {
+                        stop_lvl = price * 0.95; // fallback
+                    }
+                    pos.initial_stop = stop_lvl;
+                    pos.current_stop = stop_lvl;
+                    pos.status = "open";
+                    pos.notes = "Executed alert " + std::to_string(alert_id) + " (" + target_alert.screen + ")";
+
+                    try {
+                        int64_t new_pos_id = pimpl_->store->add_position(pos);
+                        res["position_id"] = new_pos_id;
+                        res["message"] = res.value("message", "") + " | Saved to position tracker DB (ID: " + std::to_string(new_pos_id) + ")";
+                    } catch (const std::exception& e) {
+                        std::cerr << "[HttpServer] DB error adding position: " << e.what() << std::endl;
+                        res["message"] = res.value("message", "") + " | DB error saving position: " + e.what();
+                    }
                 } else {
                     res["message"] = "DB response added but Alert ID not found.";
                 }
@@ -379,6 +428,62 @@ HttpServer::HttpServer(
             res["status"] = "success";
             res["id"] = new_id;
             return crow::response(200, res.dump());
+        } catch (const std::exception& e) {
+            nlohmann::json err = {{"error", e.what()}};
+            return crow::response(500, err.dump());
+        }
+    });
+
+    // 4c. GET /api/positions
+    CROW_ROUTE(pimpl_->app, "/api/positions")([this]() {
+        try {
+            auto list = pimpl_->store->get_positions();
+            nlohmann::json arr = nlohmann::json::array();
+            for (const auto& pos : list) {
+                nlohmann::json obj;
+                obj["id"] = pos.id;
+                obj["alert_id"] = pos.alert_id;
+                obj["instrument_id"] = pos.instrument_id;
+                
+                // Lookup symbol and name to make frontend rendering robust
+                std::string symbol = "UNKNOWN";
+                std::string name = "Unknown Instrument";
+                auto insts = pimpl_->store->get_instruments();
+                for (const auto& inst : insts) {
+                    if (inst.id == pos.instrument_id) {
+                        symbol = inst.symbol;
+                        try {
+                            if (!inst.metadata_json.empty()) {
+                                auto meta = nlohmann::json::parse(inst.metadata_json);
+                                name = meta.value("name", inst.symbol);
+                            } else {
+                                name = inst.symbol;
+                            }
+                        } catch (...) {
+                            name = inst.symbol;
+                        }
+                        break;
+                    }
+                }
+                obj["symbol"] = symbol;
+                obj["name"] = name;
+                obj["direction"] = pos.direction;
+                obj["entry_ts"] = pos.entry_ts;
+                obj["entry_price"] = pos.entry_price;
+                obj["size"] = pos.size;
+                obj["initial_stop"] = pos.initial_stop;
+                obj["current_stop"] = pos.current_stop;
+                obj["status"] = pos.status;
+                obj["exit_ts"] = pos.exit_ts;
+                obj["exit_price"] = pos.exit_price;
+                obj["exit_reason"] = pos.exit_reason;
+                obj["r_realized"] = pos.r_realized;
+                obj["max_favorable_excursion_r"] = pos.max_favorable_excursion_r;
+                obj["max_adverse_excursion_r"] = pos.max_adverse_excursion_r;
+                obj["notes"] = pos.notes;
+                arr.push_back(obj);
+            }
+            return crow::response(200, arr.dump());
         } catch (const std::exception& e) {
             nlohmann::json err = {{"error", e.what()}};
             return crow::response(500, err.dump());
@@ -529,6 +634,12 @@ HttpServer::HttpServer(
             }
             if (pimpl_->screen_f) {
                 pimpl_->screen_f->evaluate(date);
+            }
+            if (pimpl_->screen_g) {
+                pimpl_->screen_g->evaluate(date);
+            }
+            if (pimpl_->screen_c) {
+                pimpl_->screen_c->evaluate(date);
             }
 
             // Fetch the updated log to broadcast

@@ -20,7 +20,12 @@
 #include "trader/screens/screen_a.hpp"
 #include "trader/screens/screen_e.hpp"
 #include "trader/screens/screen_f.hpp"
+#include "trader/core/sr_provider.hpp"
+#include "trader/screens/screen_g.hpp"
+#include "trader/screens/screen_c.hpp"
+#include "trader/core/position_manager.hpp"
 #include <webview.h>
+#include <filesystem>
 
 
 using namespace trader;
@@ -178,9 +183,27 @@ int main() {
     auto screen_e = std::make_shared<screens::ScreenE>(store, dispatcher);
     auto screen_f = std::make_shared<screens::ScreenF>(store, dispatcher);
 
+    // Create Support/Resistance levels directory
+    std::filesystem::create_directories("./data/sr_levels");
+
+    // Initialize Support/Resistance providers
+    auto algo_sr = std::make_shared<core::AlgorithmicSRProvider>(ts_store);
+    auto file_sr = std::make_shared<core::FileBasedSRProvider>("./data/sr_levels");
+    std::vector<std::shared_ptr<core::ISupportResistanceProvider>> sr_providers = { file_sr, algo_sr };
+    auto composite_sr = std::make_shared<core::CompositeSRProvider>(sr_providers, 0.01);
+
+    // Instantiate Screen G & C
+    auto screen_g = std::make_shared<screens::ScreenG>(store, ts_store, dispatcher);
+    auto screen_c = std::make_shared<screens::ScreenC>(store, ts_store, composite_sr, screen_g, dispatcher);
+
+    // Instantiate Position Manager
+    auto position_manager = std::make_shared<core::PositionManager>(store, ts_store, composite_sr, dispatcher);
+
     // 4. Initialize and start HTTP & WebSocket Server
     // Serving built React files from "./ui/dist"
-    auto http_server = std::make_shared<web::HttpServer>(store, saxo_adapter, classifier, screen_d, screen_b, screen_a, screen_e, screen_f, ts_store, "./ui/dist", 8080);
+    auto http_server = std::make_shared<web::HttpServer>(
+        store, saxo_adapter, classifier, screen_d, screen_b, screen_a, screen_e, screen_f, screen_g, screen_c, ts_store, "./ui/dist", 8080
+    );
     http_server->start();
 
     // Register callback for realtime alert propagation
@@ -191,6 +214,7 @@ int main() {
     // Start background threads
     tg_bot->start();
     dispatcher->start();
+    position_manager->start();
 
     // Ensure CEF instruments are seeded
     auto bst_opt = store->get_instrument_by_symbol("BST");
@@ -215,6 +239,64 @@ int main() {
         store->add_instrument(inst);
         bst_nav_opt = store->get_instrument_by_symbol("BST.NAV");
     }
+
+    // Ensure Phase 7 instruments are seeded
+    auto btcusd_opt = store->get_instrument_by_symbol("BTCUSD");
+    if (!btcusd_opt) {
+        persistence::DbInstrument inst;
+        inst.symbol = "BTCUSD";
+        inst.asset_class = "Crypto";
+        inst.exchange = "SAXO";
+        inst.saxo_uic = 9012;
+        inst.metadata_json = "{\"asset_type\":\"Crypto\",\"name\":\"Bitcoin / US Dollar\"}";
+        store->add_instrument(inst);
+        btcusd_opt = store->get_instrument_by_symbol("BTCUSD");
+    }
+    auto ethusd_opt = store->get_instrument_by_symbol("ETHUSD");
+    if (!ethusd_opt) {
+        persistence::DbInstrument inst;
+        inst.symbol = "ETHUSD";
+        inst.asset_class = "Crypto";
+        inst.exchange = "SAXO";
+        inst.saxo_uic = 9013;
+        inst.metadata_json = "{\"asset_type\":\"Crypto\",\"name\":\"Ethereum / US Dollar\"}";
+        store->add_instrument(inst);
+        ethusd_opt = store->get_instrument_by_symbol("ETHUSD");
+    }
+    auto ndx_opt = store->get_instrument_by_symbol("NDX");
+    if (!ndx_opt) {
+        persistence::DbInstrument inst;
+        inst.symbol = "NDX";
+        inst.asset_class = "Indices";
+        inst.exchange = "NASDAQ";
+        inst.saxo_uic = 9014;
+        inst.metadata_json = "{\"asset_type\":\"Index\",\"name\":\"Nasdaq 100\"}";
+        store->add_instrument(inst);
+        ndx_opt = store->get_instrument_by_symbol("NDX");
+    }
+    auto n225_opt = store->get_instrument_by_symbol("^N225");
+    if (!n225_opt) {
+        persistence::DbInstrument inst;
+        inst.symbol = "^N225";
+        inst.asset_class = "Indices";
+        inst.exchange = "JPX";
+        inst.saxo_uic = 9015;
+        inst.metadata_json = "{\"asset_type\":\"Index\",\"name\":\"Nikkei 225\"}";
+        store->add_instrument(inst);
+        n225_opt = store->get_instrument_by_symbol("^N225");
+    }
+    auto stoxx_opt = store->get_instrument_by_symbol("^STOXX");
+    if (!stoxx_opt) {
+        persistence::DbInstrument inst;
+        inst.symbol = "^STOXX";
+        inst.asset_class = "Indices";
+        inst.exchange = "EUREX";
+        inst.saxo_uic = 9016;
+        inst.metadata_json = "{\"asset_type\":\"Index\",\"name\":\"Euro Stoxx 50\"}";
+        store->add_instrument(inst);
+        stoxx_opt = store->get_instrument_by_symbol("^STOXX");
+    }
+
     auto nvda_opt = store->get_instrument_by_symbol("NVDA");
 
     if (bst_opt && bst_nav_opt && nvda_opt) {

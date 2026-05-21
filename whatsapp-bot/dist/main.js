@@ -160,7 +160,7 @@ const alertsFlow = addKeyword(['/alerts'])
         await flowDynamic(`Failed to query engine: ${e.message}`);
     }
 });
-const actFlow = addKeyword(/^\/act\s+(\d+)$/, { regex: true })
+const actFlow = addKeyword('/^\\\\/act\\\\s+(\\\\d+)$/', { regex: true })
     .addAction(async (ctx, { flowDynamic }) => {
     if (!(await isAuthorized(ctx.from)))
         return;
@@ -191,7 +191,7 @@ const actFlow = addKeyword(/^\/act\s+(\d+)$/, { regex: true })
         await flowDynamic(`Failed to execute alert response: ${e.message}`);
     }
 });
-const skipFlow = addKeyword(/^\/skip\s+(\d+)$/, { regex: true })
+const skipFlow = addKeyword('/^\\\\/skip\\\\s+(\\\\d+)$/', { regex: true })
     .addAction(async (ctx, { flowDynamic }) => {
     if (!(await isAuthorized(ctx.from)))
         return;

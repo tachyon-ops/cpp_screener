@@ -329,6 +329,7 @@ Result<std::vector<Bar>> SaxoBrokerAdapter::get_bars(
             case Resolution::H1: horizon = 60; break;
             case Resolution::H4: horizon = 240; break;
             case Resolution::D1: horizon = 1440; break;
+            case Resolution::W1: horizon = 10080; break;
         }
 
         // Convert timestamps to ISO-8601 strings

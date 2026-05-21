@@ -86,6 +86,10 @@ set(SOURCE_FILES
     src/screens/screen_a.cpp
     src/screens/screen_e.cpp
     src/screens/screen_f.cpp
+    src/core/sr_provider.cpp
+    src/screens/screen_g.cpp
+    src/screens/screen_c.cpp
+    src/core/position_manager.cpp
 )
 
 # Executable target

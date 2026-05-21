@@ -1,0 +1,22 @@
+screen_g:
+  correlation_period: 30
+  zscore_period: 90
+  zscore_threshold: 2.0
+  pairs:
+    - symbol_a: "BTCUSD"
+      symbol_b: "NDX"
+    - symbol_a: "ETHUSD"
+      symbol_b: "NDX"
+    - symbol_a: "^N225"
+      symbol_b: "^STOXX"
+
+screen_c:
+  vol_drop_threshold: 3.0
+  confluence_pct_equities: 0.010
+  confluence_pct_crypto: 0.015
+  wick_ratio: 0.60
+  close_third: 0.33
+  volume_mult: 2.0
+  panic_drawdown_percentile: 0.05
+  panic_drawdown_period: 60
+  active_watch_duration_hours: 72

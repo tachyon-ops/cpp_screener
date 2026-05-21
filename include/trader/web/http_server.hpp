@@ -21,6 +21,8 @@ namespace screens {
     class ScreenA;
     class ScreenE;
     class ScreenF;
+    class ScreenG;
+    class ScreenC;
 }
 
 namespace web {
@@ -36,6 +38,8 @@ public:
         std::shared_ptr<screens::ScreenA> screen_a,
         std::shared_ptr<screens::ScreenE> screen_e,
         std::shared_ptr<screens::ScreenF> screen_f,
+        std::shared_ptr<screens::ScreenG> screen_g,
+        std::shared_ptr<screens::ScreenC> screen_c,
         std::shared_ptr<storage::TimeSeriesStore> ts_store,
         const std::string& public_dir = "./ui/dist",
         int port = 8080

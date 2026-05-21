@@ -270,12 +270,33 @@ void AlertDispatcher::calculate_position_sizes(Alert& alert) {
         alert.size_5pct = {0, 0, 0, false};
         return;
     }
+
+    double cap_pct = 0.30; // default 30%
+    if (store_) {
+        auto opt_inst = store_->get_instrument_by_symbol(alert.symbol);
+        if (opt_inst) {
+            std::string ac = opt_inst->asset_class;
+            // Convert to lowercase for safety
+            std::transform(ac.begin(), ac.end(), ac.begin(), ::tolower);
+            if (ac == "crypto") {
+                cap_pct = 0.30;
+            } else if (ac == "equity" || ac == "equities" || ac == "stock") {
+                cap_pct = 0.20;
+            } else if (ac == "fx" || ac == "forex" || ac == "currency") {
+                cap_pct = 0.50;
+            } else if (ac == "commodity" || ac == "commodities") {
+                cap_pct = 0.25;
+            } else if (ac == "index" || ac == "indices") {
+                cap_pct = 0.30;
+            }
+        }
+    }
     
-    auto calculate_tier = [equity, entry, risk_per_unit](double risk_pct) -> Alert::PositionSize {
+    auto calculate_tier = [equity, entry, risk_per_unit, cap_pct](double risk_pct) -> Alert::PositionSize {
         double risk_amt = equity * risk_pct;
         double units = risk_amt / risk_per_unit;
         double cost = units * entry;
-        double max_cost = equity * 0.30;
+        double max_cost = equity * cap_pct;
         bool capped = false;
         if (cost > max_cost) {
             units = max_cost / entry;

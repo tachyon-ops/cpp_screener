@@ -45,7 +45,7 @@ struct Tick {
 };
 
 enum class Resolution {
-    M1, M5, M15, M30, H1, H4, D1
+    M1, M5, M15, M30, H1, H4, D1, W1
 };
 
 struct AccountInfo {

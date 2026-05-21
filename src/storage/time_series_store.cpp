@@ -8,7 +8,7 @@ namespace trader {
 namespace storage {
 
 TimeSeries::TimeSeries(size_t max_bars)
-    : daily_(500), hourly_(1000), min5_(max_bars), min1_(max_bars), ticks_(1000) {}
+    : daily_(500), hourly_(1000), h4_(1000), w1_(500), min5_(max_bars), min1_(max_bars), ticks_(1000) {}
 
 void TimeSeries::append_tick(const core::Tick& t) {
     std::unique_lock<std::shared_mutex> lock(mu_);
@@ -91,8 +91,12 @@ void TimeSeries::append_bar(const core::Bar& b, core::Resolution r) {
         min5_.push_back(b);
     } else if (r == core::Resolution::H1) {
         hourly_.push_back(b);
+    } else if (r == core::Resolution::H4) {
+        h4_.push_back(b);
     } else if (r == core::Resolution::D1) {
         daily_.push_back(b);
+    } else if (r == core::Resolution::W1) {
+        w1_.push_back(b);
     }
 }
 
@@ -103,7 +107,9 @@ std::vector<core::Bar> TimeSeries::last_n(core::Resolution r, size_t n) const {
     if (r == core::Resolution::M1) buffer = &min1_;
     else if (r == core::Resolution::M5) buffer = &min5_;
     else if (r == core::Resolution::H1) buffer = &hourly_;
+    else if (r == core::Resolution::H4) buffer = &h4_;
     else if (r == core::Resolution::D1) buffer = &daily_;
+    else if (r == core::Resolution::W1) buffer = &w1_;
 
     size_t sz = buffer->size();
     size_t count = std::min(n, sz);
@@ -120,7 +126,9 @@ std::optional<core::Bar> TimeSeries::latest(core::Resolution r) const {
     if (r == core::Resolution::M1) buffer = &min1_;
     else if (r == core::Resolution::M5) buffer = &min5_;
     else if (r == core::Resolution::H1) buffer = &hourly_;
+    else if (r == core::Resolution::H4) buffer = &h4_;
     else if (r == core::Resolution::D1) buffer = &daily_;
+    else if (r == core::Resolution::W1) buffer = &w1_;
 
     if (buffer->empty()) return std::nullopt;
     return buffer->back();
@@ -175,57 +183,44 @@ std::shared_ptr<TimeSeries> TimeSeriesStore::get(const std::string& symbol) cons
 void TimeSeriesStore::pre_populate(const std::string& symbol, double current_price) {
     auto ts = get_or_create(symbol);
     
-    // Clear the buffers first
-    // Note: The CircularBuffer itself doesn't have a resize, but we can clear by calling ts's private clear if we exposed it,
-    // or just let pre_populate construct a new one. Since ts is fresh or we want to overwrite, let's just push bars.
-    // In our case we generate 200 bars going backward.
     uint64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now().time_since_epoch()
     ).count();
 
     std::random_device rd;
     std::mt19937 gen(rd() ^ std::hash<std::string>()(symbol));
-    std::normal_distribution<> pct_change(0.00005, 0.001); // slightly upward random walk
     
-    double price = current_price;
-    std::vector<core::Bar> mock_bars;
-    
-    // Generate 200 bars going backward
-    for (int i = 200; i >= 1; --i) {
-        price *= (1.0 + pct_change(gen));
-        core::Bar b;
-        b.ts.ms_since_epoch = now_ms - (i * 5 * 60 * 1000);
-        b.open.value = price * (1.0 - 0.001);
-        b.high.value = price * (1.0 + 0.002);
-        b.low.value = price * (1.0 - 0.002);
-        b.close.value = price;
-        b.volume.value = 1000.0 + (gen() % 9000);
-        mock_bars.push_back(b);
-    }
-    
-    for (const auto& b : mock_bars) {
-        ts->append_bar(b, core::Resolution::M5);
-    }
+    // Helper lambda to generate and push bars going backward
+    auto generate_and_push = [&](core::Resolution r, int count, uint64_t interval_ms, double walk_stddev) {
+        std::normal_distribution<> local_walk(0.00005, walk_stddev);
+        double price = current_price;
+        std::vector<core::Bar> mock_bars;
+        mock_bars.reserve(count);
+        for (int i = count; i >= 1; --i) {
+            price *= (1.0 + local_walk(gen));
+            core::Bar b;
+            b.ts.ms_since_epoch = now_ms - (i * interval_ms);
+            b.open.value = price * (1.0 - 0.001);
+            b.high.value = price * (1.0 + 0.002);
+            b.low.value = price * (1.0 - 0.002);
+            b.close.value = price;
+            b.volume.value = 1000.0 + (gen() % 9000);
+            mock_bars.push_back(b);
+        }
+        for (const auto& b : mock_bars) {
+            ts->append_bar(b, r);
+        }
+    };
 
-    // Also populate 100 1-minute bars
-    price = current_price;
-    std::vector<core::Bar> mock_m1_bars;
-    for (int i = 100; i >= 1; --i) {
-        price *= (1.0 + pct_change(gen));
-        core::Bar b;
-        b.ts.ms_since_epoch = now_ms - (i * 1 * 60 * 1000);
-        b.open.value = price * (1.0 - 0.0005);
-        b.high.value = price * (1.0 + 0.001);
-        b.low.value = price * (1.0 - 0.001);
-        b.close.value = price;
-        b.volume.value = 200.0 + (gen() % 1800);
-        mock_m1_bars.push_back(b);
-    }
-    for (const auto& b : mock_m1_bars) {
-        ts->append_bar(b, core::Resolution::M1);
-    }
-    
-    std::cout << "[TimeSeriesStore] Pre-populated " << symbol << " with 200 M5 bars and 100 M1 bars at base price $" << current_price << std::endl;
+    // Populate buffers
+    generate_and_push(core::Resolution::M1, 100, 60 * 1000, 0.0005);
+    generate_and_push(core::Resolution::M5, 200, 5 * 60 * 1000, 0.001);
+    generate_and_push(core::Resolution::H1, 200, 60 * 60 * 1000, 0.002);
+    generate_and_push(core::Resolution::H4, 150, 4 * 60 * 60 * 1000, 0.004);
+    generate_and_push(core::Resolution::D1, 150, 24 * 60 * 60 * 1000, 0.008);
+    generate_and_push(core::Resolution::W1, 50, 7 * 24 * 60 * 60 * 1000, 0.015);
+
+    std::cout << "[TimeSeriesStore] Pre-populated " << symbol << " for all resolutions (M1-W1) at base price $" << current_price << std::endl;
 }
 
 } // namespace storage
