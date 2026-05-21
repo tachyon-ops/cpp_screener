@@ -10,9 +10,8 @@
     "dev": "tsc-watch --onSuccess \"node dist/main.js\""
   },
   "dependencies": {
-    "@builderbot/bot": "^2.1.2",
-    "@builderbot/provider-baileys": "^2.1.2",
-    "@builderbot/database-memory": "^2.1.2",
+    "@builderbot/bot": "^1.4.1",
+    "@builderbot/provider-baileys": "^1.4.1",
     "ws": "^8.16.0",
     "dotenv": "^16.4.5"
   },

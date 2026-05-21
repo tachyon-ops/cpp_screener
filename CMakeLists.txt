@@ -80,6 +80,8 @@ set(SOURCE_FILES
     src/core/regime_classifier.cpp
     src/screens/screen_d.cpp
     src/screens/screen_b.cpp
+    src/core/telegram.cpp
+    src/core/alert_dispatcher.cpp
 )
 
 # Executable target
