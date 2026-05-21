@@ -69,8 +69,9 @@ revisable — but the revision is a decision in itself.
 
 ## Storage
 
-ADRs live in the repository, versioned with the code. A typical
-location:
+ADRs live in the repository, versioned with the code. Note that the `docs/adr/` directory is virtual/planned and should be created on demand when writing the first ADR.
+
+A typical location:
 
 ```
 docs/adr/
@@ -80,8 +81,7 @@ docs/adr/
   0004-event-bus.md
 ```
 
-Numbering is sequential and never reused. Filenames include the number
-and a short slug.
+Numbering is sequential and never reused. Filenames include the number and a short slug.
 
 ---
 
@@ -206,12 +206,11 @@ OAuth2 client-credentials flow.
 
 ## What an Agent Must Do
 
-- Before making a non-trivial architectural choice, search `docs/adr/`
-  for relevant prior decisions.
+- Before making a non-trivial architectural choice, search `docs/adr/` for relevant prior decisions (if the directory exists).
 - If a relevant ADR exists, follow it. If you would contradict it,
   pause and surface the conflict.
 - If no ADR covers the decision and the decision is consequential,
-  draft one — even briefly — and ask the human to ratify it before
+  draft one — even briefly (creating the `docs/adr/` folder if it does not yet exist) — and ask the human to ratify it before
   implementing.
 - When writing an ADR, follow the template. Keep it short. Be honest
   about the trade-offs.

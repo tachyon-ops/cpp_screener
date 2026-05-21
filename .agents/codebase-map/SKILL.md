@@ -12,9 +12,9 @@ description: >
 
 - **Name:** cpp_screener
 - **Purpose (one sentence):** A multi-instrument, multi-asset-class market screener and alert engine that evaluates independent screen modules against a wide universe, gates by market regime, and emits alerts.
-- **Primary stack:** C++17/C++20, SQLite, Crow/Drogon (HTTP/WS), React (UI)
-- **Repository layout:** Monolithic C++ Application
-- **Build orchestrator:** CMake
+- **Primary stack:** C++20, SQLite, Crow (HTTP/WS), React (UI), Cocoa/WebKit Webview GUI
+- **Repository layout:** Monolithic C++ Application with React SPA
+- **Build orchestrator:** CMake and pnpm
 
 ---
 
@@ -23,13 +23,19 @@ description: >
 ```text
 cpp_screener/
 ├── CMakeLists.txt              ← Top-level build config
-├── config/                     ← Engine config (ports, thresholds, universe, screens) and secrets
+├── run.sh                      ← Unified build & run script
+├── pnpm-workspace.yaml         ← pnpm monorepo/workspace config
+├── pnpm-lock.yaml              ← pnpm lockfile
 ├── include/trader/             ← Public headers (interfaces, core types, shared structures)
 ├── src/                        ← Implementation files and private headers
 ├── ui/                         ← React SPA (Vite) utilizing Prisma UI components
-├── scripts/                    ← Helper scripts (backfill history, run backtests)
-├── tests/                      ← GoogleTest unit and replay tests
-├── docs/                       ← Specifications and architectural notes
+├── vendor/prisma/              ← [Read-Only] Git submodule containing shared PRISMA UI library
+├── data/                       ← Data directory for SQLite databases (e.g. screener.db, tokens.db)
+├── build/                      ← CMake build directory (created at build time)
+├── config/                     ← [Planned/Virtual] Engine config (ports, thresholds, universe, screens) and secrets
+├── scripts/                    ← [Planned/Virtual] Helper scripts (backfill history, run backtests)
+├── tests/                      ← [Planned/Virtual] GoogleTest unit and replay tests
+├── docs/                       ← [Planned/Virtual] Specifications and architectural notes
 └── .agents/                    ← Agent skills and rules
 ```
 
@@ -40,17 +46,19 @@ cpp_screener/
 | Kind of thing | Where it lives | Naming convention |
 |---|---|---|
 | Domain entities and types | `include/trader/core/` | `snake_case.hpp` |
-| Pure business logic | `src/core/` | `snake_case.cpp` |
+| Pure business logic | `src/core/` [Planned] | `snake_case.cpp` |
 | Ports (interfaces for I/O) | `include/trader/broker/` | `abstract_interface.hpp` |
 | Adapters (Port implementations) | `src/broker/` | `snake_case.cpp` |
-| HTTP / API endpoints | `src/web/` | `snake_case.cpp` |
-| Screen logic | `src/screens/` | `screen_id_name.cpp` |
-| Regime classification | `src/regime/` | `snake_case.cpp` |
-| Database store / schemas | `src/persistence/` | `snake_case.cpp` |
-| Configuration | `config/` | `*.yaml` or `*.env` |
+| HTTP / API endpoints / Web Server | `src/web/` / `include/trader/web/` | `snake_case.cpp` / `snake_case.hpp` |
+| Token / Credentials Storage | `src/storage/` / `include/trader/storage/` | `snake_case.cpp` / `snake_case.hpp` |
+| Screen logic | `src/screens/` [Planned] | `screen_id_name.cpp` |
+| Regime classification | `src/regime/` [Planned] | `snake_case.cpp` |
+| Database store / schemas | `src/persistence/` / `include/trader/persistence/` | `snake_case.cpp` / `snake_case.hpp` |
+| Database Files | `data/` | `*.db` |
+| Configuration | Configured via DB seeds / environment variables | N/A |
 | Frontend components | `ui/src/` | React TSX, `*.tsx`, `*.ts` |
-| Unit tests | `tests/unit/` | `*_test.cpp` |
-| Integration/Replay tests | `tests/replay/` | `*_test.cpp` |
+| Unit tests | `tests/unit/` [Planned] | `*_test.cpp` |
+| Integration/Replay tests | `tests/replay/` [Planned] | `*_test.cpp` |
 
 ---
 
@@ -72,35 +80,48 @@ core/*                      ← pure, dependency-free types (Price, Timestamp, I
 
 ## Build, Run, Test
 
+The application has a unified compilation and execution script:
+
 ```bash
-# Configure and build backend
-mkdir -p build && cd build
-cmake ..
-make -j4
-
-# Build UI
-cd ui
-npm install
-npm run build
-
-# Run engine (will serve ui/dist)
-./trader-engine
-
-# Run tests
-cd build && ctest --output-on-failure
+# Clean build and run the entire stack (React SPA UI + C++ Backend + Webview GUI)
+./run.sh
 ```
+
+### Manual Individual Steps
+
+If you need to run compilation steps manually:
+
+```bash
+# 1. Build the React SPA UI (using pnpm workspaces)
+pnpm --filter ui build
+
+# 2. Configure CMake in the build/ directory
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+# 3. Compile C++ Backend and Webview wrapper
+cmake --build build -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+
+# 4. Run the engine (serves ui/dist on port 8080, launches native macOS desktop window)
+./build/trader_engine
+```
+
+### Testing
+
+Automated tests (GoogleTest) are planned under a virtual `tests/` directory but are not yet implemented in the initial phases of the project.
 
 ---
 
 ## Environment
 
-- See `config/secrets.env` for API keys.
-- Requires Saxo OpenAPI credentials for live streaming, and SQLite3 available.
+- Saxo Bank API credentials and OAuth tokens are stored in the SQLite database `./data/tokens.db` (decrypted using a default key `c55f7b0566a4b5f6a2406d8d7b3a9242dda2e55ec3d136892a4d9950a908b4cc`).
+- The application database stores instruments, regime logs, candidates, and alerts at `./data/screener.db`.
+- The Webview component runs on the main thread and displays the React SPA served locally from `http://localhost:8080`.
 
 ---
 
 ## Key Documents to Read
 
 1. This file (`codebase-map`)
-2. `SPECS_v1.0.md` — The foundational architectural blueprint
-3. Other library skills relevant to the task (`architecture`, `api-design`)
+2. [SPECS_v2.0.md](file:///Users/nunoribeiro/repos/cpp_screener/SPECS_v2.0.md) — The current architectural blueprint and specification
+3. [SPECS_v1.0.md](file:///Users/nunoribeiro/repos/cpp_screener/SPECS_v1.0.md) — The foundational blueprint
+4. Other library skills relevant to the task (`architecture`, `api-design`, `prisma-ui`)
