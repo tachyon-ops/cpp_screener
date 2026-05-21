@@ -1,0 +1,15 @@
+clusters:
+  - id: us_regional_banks
+    leader: KRE
+    members: [NYCB, ZION, PACW, WAL, CMA, KEY, RF, FITB, HBAN, MTB, USB]
+    asset_class: equity
+
+  - id: crypto_majors_l1
+    leader: BTCUSD
+    members: [ETHUSD, SOLUSD, AVAXUSD, ADAUSD, DOTUSD]
+    asset_class: crypto
+
+  - id: jp_market
+    leader: ^N225
+    members: [SONY, TM, MUFG, SMFG, NTDOY]
+    asset_class: equity_jp

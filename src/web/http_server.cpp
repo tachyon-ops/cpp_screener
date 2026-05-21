@@ -1,6 +1,7 @@
 #include "trader/web/http_server.hpp"
 #include "trader/core/regime_classifier.hpp"
 #include "trader/screens/screen_d.hpp"
+#include "trader/screens/screen_b.hpp"
 #include <crow.h>
 #include <nlohmann/json.hpp>
 #include <iostream>
@@ -18,6 +19,7 @@ struct HttpServer::Impl {
     std::shared_ptr<broker::BrokerAdapter> broker;
     std::shared_ptr<core::RegimeClassifier> classifier;
     std::shared_ptr<screens::ScreenD> screen_d;
+    std::shared_ptr<screens::ScreenB> screen_b;
     std::string public_dir;
     int port;
 
@@ -31,9 +33,10 @@ struct HttpServer::Impl {
         std::shared_ptr<broker::BrokerAdapter> b,
         std::shared_ptr<core::RegimeClassifier> c,
         std::shared_ptr<screens::ScreenD> sd,
+        std::shared_ptr<screens::ScreenB> sb,
         std::string dir,
         int p
-    ) : store(std::move(s)), broker(std::move(b)), classifier(std::move(c)), screen_d(std::move(sd)), public_dir(std::move(dir)), port(p) {}
+    ) : store(std::move(s)), broker(std::move(b)), classifier(std::move(c)), screen_d(std::move(sd)), screen_b(std::move(sb)), public_dir(std::move(dir)), port(p) {}
 
     void broadcast(const std::string& text) {
         std::lock_guard<std::mutex> lock(ws_mutex);
@@ -92,9 +95,10 @@ HttpServer::HttpServer(
     std::shared_ptr<broker::BrokerAdapter> broker,
     std::shared_ptr<core::RegimeClassifier> classifier,
     std::shared_ptr<screens::ScreenD> screen_d,
+    std::shared_ptr<screens::ScreenB> screen_b,
     const std::string& public_dir,
     int port
-) : pimpl_(std::make_unique<Impl>(std::move(store), std::move(broker), std::move(classifier), std::move(screen_d), public_dir, port)) {
+) : pimpl_(std::make_unique<Impl>(std::move(store), std::move(broker), std::move(classifier), std::move(screen_d), std::move(screen_b), public_dir, port)) {
 
     // Define REST Endpoints
 
@@ -234,6 +238,30 @@ HttpServer::HttpServer(
                 obj["created_ts"] = cand.created_ts;
                 obj["screen"] = cand.screen;
                 obj["instrument_id"] = cand.instrument_id;
+                
+                // Lookup symbol and name to make frontend rendering robust
+                std::string symbol = "UNKNOWN";
+                std::string name = "Unknown Instrument";
+                auto insts = pimpl_->store->get_instruments();
+                for (const auto& inst : insts) {
+                    if (inst.id == cand.instrument_id) {
+                        symbol = inst.symbol;
+                        try {
+                            if (!inst.metadata_json.empty()) {
+                                auto meta = nlohmann::json::parse(inst.metadata_json);
+                                name = meta.value("name", inst.symbol + " Common Stock");
+                            } else {
+                                name = inst.symbol + " Common Stock";
+                            }
+                        } catch (...) {
+                            name = inst.symbol + " Common Stock";
+                        }
+                        break;
+                    }
+                }
+                obj["symbol"] = symbol;
+                obj["name"] = name;
+                
                 obj["entry_zone_low"] = cand.entry_zone_low;
                 obj["entry_zone_high"] = cand.entry_zone_high;
                 obj["suggested_stop"] = cand.suggested_stop;
@@ -422,6 +450,9 @@ HttpServer::HttpServer(
             // Trigger evaluations
             core::Regime new_regime = pimpl_->classifier->evaluate(date, vix, hy_oas, breadth, spx);
             pimpl_->screen_d->evaluate(date);
+            if (pimpl_->screen_b) {
+                pimpl_->screen_b->evaluate(date);
+            }
 
             // Fetch the updated log to broadcast
             auto logs = pimpl_->store->get_regime_log(1);
@@ -455,6 +486,44 @@ HttpServer::HttpServer(
             res["status"] = "success";
             res["date"] = date;
             res["regime"] = core::regime_to_string(new_regime);
+            return crow::response(200, res.dump());
+        } catch (const std::exception& e) {
+            nlohmann::json err = {{"error", e.what()}};
+            return crow::response(500, err.dump());
+        }
+    });
+
+    // GET /api/settings
+    CROW_ROUTE(pimpl_->app, "/api/settings")([this]() {
+        try {
+            auto pairs = pimpl_->store->get_all_settings();
+            nlohmann::json obj = nlohmann::json::object();
+            for (const auto& pair : pairs) {
+                obj[pair.first] = pair.second;
+            }
+            if (!obj.contains("whatsapp_enabled")) obj["whatsapp_enabled"] = "false";
+            if (!obj.contains("whatsapp_recipient")) obj["whatsapp_recipient"] = "";
+            return crow::response(200, obj.dump());
+        } catch (const std::exception& e) {
+            nlohmann::json err = {{"error", e.what()}};
+            return crow::response(500, err.dump());
+        }
+    });
+
+    // POST /api/settings
+    CROW_ROUTE(pimpl_->app, "/api/settings").methods(crow::HTTPMethod::POST)([this](const crow::request& req) {
+        try {
+            auto body = nlohmann::json::parse(req.body);
+            for (auto it = body.begin(); it != body.end(); ++it) {
+                if (it.value().is_string()) {
+                    pimpl_->store->set_setting(it.key(), it.value().get<std::string>());
+                } else if (it.value().is_boolean()) {
+                    pimpl_->store->set_setting(it.key(), it.value().get<bool>() ? "true" : "false");
+                } else if (it.value().is_number()) {
+                    pimpl_->store->set_setting(it.key(), std::to_string(it.value().get<double>()));
+                }
+            }
+            nlohmann::json res = {{"status", "success"}};
             return crow::response(200, res.dump());
         } catch (const std::exception& e) {
             nlohmann::json err = {{"error", e.what()}};

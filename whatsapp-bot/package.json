@@ -1,0 +1,25 @@
+{
+  "name": "whatsapp-bot",
+  "version": "1.0.0",
+  "description": "WhatsApp Bot for C++ Screener Alerts using BuilderBot",
+  "main": "dist/main.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "dev": "tsc-watch --onSuccess \"node dist/main.js\""
+  },
+  "dependencies": {
+    "@builderbot/bot": "^2.1.2",
+    "@builderbot/provider-baileys": "^2.1.2",
+    "@builderbot/database-memory": "^2.1.2",
+    "ws": "^8.16.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/node": "^20.11.24",
+    "@types/ws": "^8.5.10",
+    "tsc-watch": "^6.0.4"
+  }
+}

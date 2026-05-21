@@ -147,6 +147,11 @@ public:
     int64_t add_alert_response(const DbAlertResponse& resp);
     std::vector<DbAlertResponse> get_alert_responses(int64_t alert_id);
 
+    // Settings storage methods
+    void set_setting(const std::string& key, const std::string& value);
+    std::optional<std::string> get_setting(const std::string& key);
+    std::vector<std::pair<std::string, std::string>> get_all_settings();
+
     // Asynchronous Batched Writes
     void add_instrument_async(const DbInstrument& inst);
     void add_bar_daily_async(const DbBarDaily& bar);

@@ -234,6 +234,10 @@ void SQLiteStore::init_schema() {
         "  note_text TEXT,"
         "  FOREIGN KEY (alert_id) REFERENCES alerts(id)"
         ");"
+        "CREATE TABLE IF NOT EXISTS settings ("
+        "  key TEXT PRIMARY KEY,"
+        "  value TEXT NOT NULL"
+        ");"
         "CREATE INDEX IF NOT EXISTS idx_alerts_ts ON alerts(ts);"
         "CREATE INDEX IF NOT EXISTS idx_alerts_screen ON alerts(screen);"
         "CREATE INDEX IF NOT EXISTS idx_bars_daily_date ON bars_daily(date);"
@@ -891,6 +895,54 @@ std::vector<DbAlertResponse> SQLiteStore::get_alert_responses(int64_t alert_id) 
             const char* note = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5));
             resp.note_text = note ? note : "";
             list.push_back(resp);
+        }
+    }
+    sqlite3_finalize(stmt);
+    return list;
+}
+
+void SQLiteStore::set_setting(const std::string& key, const std::string& value) {
+    std::lock_guard<std::mutex> lock(pimpl_->db_mutex);
+    const char* sql = "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?);";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(pimpl_->db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        throw std::runtime_error(std::string("Prepare fail: ") + sqlite3_errmsg(pimpl_->db));
+    }
+    sqlite3_bind_text(stmt, 1, key.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, value.c_str(), -1, SQLITE_TRANSIENT);
+    if (sqlite3_step(stmt) != SQLITE_DONE) {
+        sqlite3_finalize(stmt);
+        throw std::runtime_error(std::string("Step fail: ") + sqlite3_errmsg(pimpl_->db));
+    }
+    sqlite3_finalize(stmt);
+}
+
+std::optional<std::string> SQLiteStore::get_setting(const std::string& key) {
+    std::lock_guard<std::mutex> lock(pimpl_->db_mutex);
+    const char* sql = "SELECT value FROM settings WHERE key = ?;";
+    sqlite3_stmt* stmt = nullptr;
+    std::optional<std::string> result;
+    if (sqlite3_prepare_v2(pimpl_->db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, key.c_str(), -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            const char* val = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+            result = val ? val : "";
+        }
+    }
+    sqlite3_finalize(stmt);
+    return result;
+}
+
+std::vector<std::pair<std::string, std::string>> SQLiteStore::get_all_settings() {
+    std::lock_guard<std::mutex> lock(pimpl_->db_mutex);
+    std::vector<std::pair<std::string, std::string>> list;
+    const char* sql = "SELECT key, value FROM settings;";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(pimpl_->db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            const char* key = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+            const char* val = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+            list.push_back({key ? key : "", val ? val : ""});
         }
     }
     sqlite3_finalize(stmt);

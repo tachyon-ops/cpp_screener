@@ -13,6 +13,7 @@ namespace core {
 
 namespace screens {
     class ScreenD;
+    class ScreenB;
 }
 
 namespace web {
@@ -24,6 +25,7 @@ public:
         std::shared_ptr<broker::BrokerAdapter> broker,
         std::shared_ptr<core::RegimeClassifier> classifier,
         std::shared_ptr<screens::ScreenD> screen_d,
+        std::shared_ptr<screens::ScreenB> screen_b,
         const std::string& public_dir = "./ui/dist",
         int port = 8080
     );

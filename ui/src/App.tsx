@@ -41,6 +41,8 @@ interface Candidate {
   created_ts: string;
   screen: string;
   instrument_id: number;
+  symbol: string;
+  name: string;
   entry_zone_low: number;
   entry_zone_high: number;
   suggested_stop: number;
@@ -69,13 +71,18 @@ interface RotationResult {
 }
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'alerts' | 'candidates' | 'universe' | 'rotation'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'alerts' | 'candidates' | 'universe' | 'rotation' | 'settings'>('dashboard');
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [instruments, setInstruments] = useState<Instrument[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [regime, setRegime] = useState<Regime | null>(null);
   const [ticks, setTicks] = useState<Record<string, number>>({});
+  const [candFilter, setCandFilter] = useState<'all' | 'active' | 'expired'>('active');
+  const [settings, setSettings] = useState<Record<string, string>>({
+    whatsapp_enabled: 'false',
+    whatsapp_recipient: ''
+  });
   
   // Sector Rotation State
   const [rotationData, setRotationData] = useState<RotationResult[]>([]);
@@ -107,12 +114,13 @@ function App() {
   const fetchData = async () => {
     try {
       setLoadingRotation(true);
-      const [resRegime, resAlerts, resCandidates, resInstruments, resRotation] = await Promise.all([
+      const [resRegime, resAlerts, resCandidates, resInstruments, resRotation, resSettings] = await Promise.all([
         fetch('/api/regime'),
         fetch('/api/alerts'),
         fetch('/api/candidates'),
         fetch('/api/instruments'),
-        fetch('/api/sector_rotation')
+        fetch('/api/sector_rotation'),
+        fetch('/api/settings')
       ]);
 
       if (resRegime.ok) {
@@ -123,6 +131,9 @@ function App() {
       if (resCandidates.ok) setCandidates(await resCandidates.json());
       if (resInstruments.ok) setInstruments(await resInstruments.json());
       if (resRotation.ok) setRotationData(await resRotation.json());
+      if (resSettings.ok) {
+        setSettings(await resSettings.json());
+      }
     } catch (e) {
       console.error('Failed to fetch screener data:', e);
       showToast('Error syncing with engine. Retrying...', 'error');
@@ -376,8 +387,10 @@ function App() {
       return 0;
     });
 
+  const unactedAlertsCount = alerts.filter(a => a.acted_on === 0).length;
+
   return (
-    <div className="min-h-screen bg-[#0b0c10] text-[#e0e1e6] flex flex-col font-sans select-none antialiased">
+    <div className="h-screen w-screen bg-[#07080e] text-[#e0e1e6] flex overflow-hidden font-sans select-none antialiased">
       
       {/* Toast Notification Banner */}
       {toast && (
@@ -390,58 +403,92 @@ function App() {
         </div>
       )}
 
-      {/* Header Bar */}
-      <header className="glass border-b border-white/5 py-4 px-6 flex items-center justify-between sticky top-0 z-40">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded bg-gradient-to-tr from-[#ff6d5a] to-[#825aff] flex items-center justify-center font-bold text-black text-sm">
-            T
+      {/* Left Navigation Sidebar */}
+      <aside className="w-64 border-r border-white/5 bg-[#090b11] flex flex-col justify-between h-full shrink-0">
+        <div className="flex flex-col flex-1 overflow-y-auto">
+          {/* Logo & Branding */}
+          <div className="p-5 border-b border-white/5 flex items-center gap-3 bg-black/10">
+            <div className="w-8 h-8 rounded bg-gradient-to-tr from-[#ff6d5a] to-[#825aff] flex items-center justify-center font-bold text-black text-sm shadow-[0_0_12px_rgba(255,109,90,0.3)]">
+              T
+            </div>
+            <div>
+              <h1 className="text-base font-extrabold tracking-tight m-0 text-white leading-none">TACHYON</h1>
+              <p className="text-[9px] text-gray-500 mt-1.5 uppercase tracking-wider font-semibold">C++ Multi-Screen Engine</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight m-0 text-white leading-none">TACHYON</h1>
-            <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-wider">C++ Multi-Screen Engine</p>
-          </div>
+
+          {/* Navigation Links */}
+          <nav className="flex-1 px-3 py-4 space-y-1">
+            {(['dashboard', 'alerts', 'candidates', 'universe', 'rotation', 'settings'] as const).map((tab) => {
+              const tabMeta = {
+                dashboard: { label: 'Dashboard', icon: '📊' },
+                alerts: { label: 'Screener Alerts', icon: '🚨' },
+                candidates: { label: 'Swing Watchlist', icon: '🎯' },
+                universe: { label: 'Instrument Universe', icon: '🌌' },
+                rotation: { label: 'Sector Heatmap', icon: '📈' },
+                settings: { label: 'Settings', icon: '⚙️' }
+              };
+              const meta = tabMeta[tab];
+              const isActive = activeTab === tab;
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all duration-150 ${
+                    isActive 
+                      ? 'bg-gradient-to-r from-[#ff6d5a]/15 to-transparent text-white border-l-2 border-[#ff6d5a]' 
+                      : 'text-gray-400 hover:text-white hover:bg-white/5 border-l-2 border-transparent'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-sm opacity-80">{meta.icon}</span>
+                    <span>{meta.label}</span>
+                  </div>
+                  {tab === 'alerts' && unactedAlertsCount > 0 && (
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-[#ff6d5a] text-black animate-pulse font-mono">
+                      {unactedAlertsCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
         </div>
 
-        {/* Navigation Tabs */}
-        <nav className="flex gap-1 bg-black/40 p-1 rounded-lg border border-white/5">
-          {(['dashboard', 'alerts', 'candidates', 'universe', 'rotation'] as const).map((tab) => {
-            const labels: Record<string, string> = {
-              dashboard: 'Dashboard',
-              alerts: 'Alerts',
-              candidates: 'Candidates',
-              universe: 'Universe',
-              rotation: 'Sector Heatmap'
-            };
-            return (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 rounded-md text-xs font-semibold uppercase tracking-wider transition-all duration-200 ${
-                  activeTab === tab 
-                    ? 'bg-gradient-to-r from-[#ff6d5a] to-[#ff8c7a] text-black shadow-md font-bold' 
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                {labels[tab]}
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Engine Status */}
-        <div className="flex items-center gap-4 text-xs">
-          <div className="flex items-center gap-2">
-            <span className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></span>
-            <span className="text-gray-400">Stream: {isConnected ? 'Live' : 'Offline'}</span>
-          </div>
-          <div className="text-gray-500 border-l border-white/10 pl-4">
-            Port: <span className="text-gray-300">8080</span>
+        {/* Sidebar Footer: Engine Connection Status */}
+        <div className="p-4 border-t border-white/5 bg-black/10 space-y-3">
+          <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></span>
+              <span className="text-gray-400 font-medium">Stream: {isConnected ? 'Live' : 'Offline'}</span>
+            </div>
+            <span className="text-[10px] bg-white/5 border border-white/10 px-2 py-0.5 rounded text-gray-400 font-mono">
+              Port 8080
+            </span>
           </div>
         </div>
-      </header>
+      </aside>
 
-      {/* Main Workspace Body */}
-      <main className="flex-1 p-8 max-w-7xl mx-auto w-full">
+      {/* Main Workspace Frame */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#0c0d14]">
+        
+        {/* Top bar header */}
+        <header className="h-14 px-6 border-b border-white/5 flex items-center justify-between bg-[#090b11]/50 backdrop-blur-md">
+            <span className="text-xs text-white font-bold uppercase tracking-widest bg-white/5 border border-white/5 px-2.5 py-1 rounded-md">
+              {activeTab === 'rotation' ? 'Sector Heatmap' : activeTab === 'candidates' ? 'Swing Watchlist' : activeTab === 'universe' ? 'Instrument Universe' : activeTab === 'settings' ? 'Settings' : activeTab}
+            </span>
+
+          {/* Quick Regime status banner directly in header */}
+          {regime && (
+            <div className={`flex items-center gap-2 px-3 py-1 rounded-full border text-[10px] font-bold tracking-widest uppercase ${getRegimeColor(regime.regime)}`}>
+              <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse"></span>
+              Market Regime: {regime.regime}
+            </div>
+          )}
+        </header>
+
+        {/* Main Workspace Body */}
+        <main className="flex-1 p-6 overflow-y-auto w-full">
         {activeTab === 'dashboard' && (
           <div className="space-y-8 animate-fade-in">
             {/* Market Regime & Key Indicators Grid */}
@@ -663,7 +710,7 @@ function App() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
               {alerts.map((alert) => (
                 <div key={alert.id} className="glass border border-white/5 p-6 rounded-xl hover:border-white/10 transition">
                   <div className="flex justify-between items-start">
@@ -733,165 +780,391 @@ function App() {
           </div>
         )}
 
-        {/* Candidates Page Tab */}
-        {activeTab === 'candidates' && (
-          <div className="space-y-6 animate-fade-in">
-            <div className="flex justify-between items-center">
-              <div>
-                <h2 className="text-2xl font-bold text-white">Setup Candidates</h2>
-                <p className="text-xs text-gray-400 mt-1">Pending and tracked positions awaiting confirmation entry zone.</p>
-              </div>
-              <button 
-                onClick={() => setShowCandForm(!showCandForm)}
-                className="bg-gradient-to-r from-[#ff6d5a] to-[#ff8c7a] text-black text-xs font-bold rounded-lg px-4 py-2 hover:opacity-90 transition"
-              >
-                {showCandForm ? 'Close Form' : 'New Setup Candidate'}
-              </button>
-            </div>
+        {/* Candidates Page Tab - Swing Watchlist Dashboard */}
+        {activeTab === 'candidates' && (() => {
+          const getCandidateTier = (notes: string) => {
+            if (notes.includes('Tier: premium')) return 'premium';
+            if (notes.includes('Tier: opportunity')) return 'opportunity';
+            if (notes.includes('Tier: interesting')) return 'interesting';
+            return 'manual';
+          };
 
-            {showCandForm && (
-              <form onSubmit={handleCreateCandidate} className="glass border border-white/5 p-6 rounded-xl max-w-xl space-y-4">
-                <h3 className="font-bold text-sm text-white">Create Candidate Setup</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">Symbol</label>
-                    <input 
-                      type="text" 
-                      value={candSymbol} 
-                      onChange={(e) => setCandSymbol(e.target.value)} 
-                      placeholder="e.g. SPY" 
-                      className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">Screen Class</label>
-                    <select 
-                      value={candScreen} 
-                      onChange={(e) => setCandScreen(e.target.value)}
-                      className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-gray-300"
-                    >
-                      <option value="A">Screen A - Mean Reversion</option>
-                      <option value="B">Screen B - Pullback</option>
-                      <option value="F">Screen F - Darvas Breakout</option>
-                    </select>
-                  </div>
-                </div>
+          const getTierBorderColor = (tier: string) => {
+            switch (tier) {
+              case 'premium': return 'border-rose-500/40 bg-rose-950/5 shadow-[0_0_15px_rgba(244,63,94,0.08)]';
+              case 'opportunity': return 'border-[#825aff]/40 bg-[#825aff]/5 shadow-[0_0_15px_rgba(130,90,255,0.08)]';
+              case 'interesting': return 'border-sky-500/30 bg-sky-950/5';
+              default: return 'border-white/10 bg-white/5';
+            }
+          };
 
-                <div className="grid grid-cols-4 gap-2">
-                  <div>
-                    <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">Entry Low</label>
-                    <input 
-                      type="number" 
-                      step="any"
-                      value={candLow} 
-                      onChange={(e) => setCandLow(e.target.value)} 
-                      className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">Entry High</label>
-                    <input 
-                      type="number" 
-                      step="any"
-                      value={candHigh} 
-                      onChange={(e) => setCandHigh(e.target.value)} 
-                      className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">Stop Loss</label>
-                    <input 
-                      type="number" 
-                      step="any"
-                      value={candStop} 
-                      onChange={(e) => setCandStop(e.target.value)} 
-                      className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">R:R Target</label>
-                    <input 
-                      type="text" 
-                      value={candRR} 
-                      onChange={(e) => setCandRR(e.target.value)} 
-                      className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
-                      required
-                    />
-                  </div>
-                </div>
+          const getTierBadgeColor = (tier: string) => {
+            switch (tier) {
+              case 'premium': return 'bg-rose-500/25 text-rose-300 border border-rose-500/35';
+              case 'opportunity': return 'bg-[#825aff]/25 text-[#825aff] border border-[#825aff]/35';
+              case 'interesting': return 'bg-sky-500/20 text-sky-400 border border-sky-500/25';
+              default: return 'bg-gray-500/20 text-gray-400 border border-gray-500/20';
+            }
+          };
 
+          const filteredCandidates = candidates.filter((cand) => {
+            if (candFilter === 'active') return cand.status === 'active';
+            if (candFilter === 'expired') return cand.status === 'expired' || cand.status === 'triggered';
+            return true;
+          });
+
+          // Sort candidates: active first, premium tier first, then newest first
+          const sortedCandidates = [...filteredCandidates].sort((a, b) => {
+            if (a.status === 'active' && b.status !== 'active') return -1;
+            if (a.status !== 'active' && b.status === 'active') return 1;
+
+            const tierA = getCandidateTier(a.notes);
+            const tierB = getCandidateTier(b.notes);
+            const tierRank = { premium: 3, opportunity: 2, interesting: 1, manual: 0 };
+            const rankDiff = tierRank[tierB] - tierRank[tierA];
+            if (rankDiff !== 0) return rankDiff;
+
+            return new Date(b.created_ts).getTime() - new Date(a.created_ts).getTime();
+          });
+
+          const activeCount = candidates.filter(c => c.status === 'active').length;
+          const premiumCount = candidates.filter(c => getCandidateTier(c.notes) === 'premium' && c.status === 'active').length;
+          const expiredCount = candidates.filter(c => c.status !== 'active').length;
+
+          return (
+            <div className="space-y-6 animate-fade-in">
+              {/* Header Info */}
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                  <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">Strategy Notes</label>
-                  <textarea 
-                    value={candNotes} 
-                    onChange={(e) => setCandNotes(e.target.value)} 
-                    rows={2}
-                    className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
-                  ></textarea>
+                  <h2 className="text-2xl font-bold text-white">Swing Pullback Watchlist</h2>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Tracked setups that passed the Minervini Trend Template & volume contraction filters, currently monitoring entry levels.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleRecomputeRotation}
+                    className="bg-white/5 hover:bg-white/10 text-white border border-white/10 text-xs font-semibold rounded-lg px-4 py-2 transition flex items-center gap-1.5"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.253 8H18" />
+                    </svg>
+                    Re-evaluate
+                  </button>
+                  <button 
+                    onClick={() => setShowCandForm(!showCandForm)}
+                    className="bg-[#ff6d5a] hover:bg-[#ff8c7a] text-black text-xs font-bold rounded-lg px-4 py-2 hover:opacity-90 transition flex items-center gap-1.5"
+                  >
+                    {showCandForm ? 'Close Form' : 'New Setup Candidate'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Stats Bar */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="glass border border-white/5 p-4 rounded-xl">
+                  <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Active Watchlist</div>
+                  <div className="text-2xl font-bold text-emerald-400 mt-1 font-mono">{activeCount}</div>
+                  <div className="text-[9px] text-gray-500 mt-0.5">Monitoring buy zones</div>
+                </div>
+                <div className="glass border border-white/5 p-4 rounded-xl">
+                  <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Premium Setups</div>
+                  <div className="text-2xl font-bold text-rose-400 mt-1 font-mono">{premiumCount}</div>
+                  <div className="text-[9px] text-gray-500 mt-0.5">Passing strict Minervini</div>
+                </div>
+                <div className="glass border border-white/5 p-4 rounded-xl">
+                  <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Expired / Tripped</div>
+                  <div className="text-2xl font-bold text-gray-400 mt-1 font-mono">{expiredCount}</div>
+                  <div className="text-[9px] text-gray-500 mt-0.5">Auto-cleared positions</div>
+                </div>
+                <div className="glass border border-white/5 p-4 rounded-xl">
+                  <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Avg. R:R Target</div>
+                  <div className="text-2xl font-bold text-sky-400 mt-1 font-mono">
+                    {candidates.length > 0
+                      ? `${(candidates.reduce((acc, c) => acc + c.rr_target, 0) / candidates.length).toFixed(1)}:1`
+                      : 'N/A'
+                    }
+                  </div>
+                  <div className="text-[9px] text-gray-500 mt-0.5">Risk return profiles</div>
+                </div>
+              </div>
+
+              {/* Filter controls and custom candidate forms */}
+              <div className="flex flex-col sm:flex-row gap-3 justify-between items-center bg-black/35 p-3 rounded-xl border border-white/5">
+                <div className="text-xs text-gray-400 font-semibold px-2">
+                  Showing {sortedCandidates.length} watch items
                 </div>
 
-                <button 
-                  type="submit" 
-                  className="bg-[#ff6d5a] hover:bg-[#ff8c7a] text-black text-xs font-bold rounded-lg px-4 py-2 w-full transition"
-                >
-                  Create Setup
-                </button>
-              </form>
-            )}
+                <div className="flex bg-black/50 p-0.5 rounded-lg border border-white/10 w-full sm:w-auto">
+                  {(['active', 'expired', 'all'] as const).map((filterOpt) => (
+                    <button
+                      key={filterOpt}
+                      onClick={() => setCandFilter(filterOpt)}
+                      className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-[10px] uppercase font-bold tracking-wider transition ${
+                        candFilter === filterOpt
+                          ? 'bg-white/10 text-white shadow-sm'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      {filterOpt} Setups
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-            {/* Candidates Table */}
-            <div className="glass border border-white/5 rounded-xl overflow-hidden">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-white/5 bg-white/5 text-gray-400 font-bold uppercase tracking-wider">
-                    <th className="p-4">Symbol</th>
-                    <th className="p-4">Screen</th>
-                    <th className="p-4">Entry Zone</th>
-                    <th className="p-4">Stop Loss</th>
-                    <th className="p-4">R:R Ratio</th>
-                    <th className="p-4">Status</th>
-                    <th className="p-4">Notes</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5 font-mono text-gray-300">
-                  {candidates.map((cand) => {
-                    const inst = instruments.find(i => i.id === cand.instrument_id);
-                    return (
-                      <tr key={cand.id} className="hover:bg-white/5 transition">
-                        <td className="p-4 font-bold text-white">{inst ? inst.symbol : 'UNKNOWN'}</td>
-                        <td className="p-4">Screen {cand.screen}</td>
-                        <td className="p-4 text-emerald-400">${cand.entry_zone_low} - ${cand.entry_zone_high}</td>
-                        <td className="p-4 text-red-400">${cand.suggested_stop}</td>
-                        <td className="p-4 text-sky-400">{cand.rr_target}:1</td>
-                        <td className="p-4">
-                          <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold ${
-                            cand.status === 'active' ? 'bg-emerald-500/10 text-emerald-400' :
-                            cand.status === 'triggered' ? 'bg-[#ff6d5a]/15 text-[#ff6d5a]' :
-                            'bg-gray-500/15 text-gray-400'
-                          }`}>
-                            {cand.status}
-                          </span>
-                        </td>
-                        <td className="p-4 text-gray-400 font-sans font-medium">{cand.notes}</td>
-                      </tr>
-                    );
-                  })}
-                  {candidates.length === 0 && (
-                    <tr>
-                      <td colSpan={7} className="p-8 text-center text-gray-500 font-sans">
-                        No active setup candidates registered in database.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+              {showCandForm && (
+                <form onSubmit={handleCreateCandidate} className="glass border border-white/5 p-6 rounded-xl max-w-xl space-y-4">
+                  <h3 className="font-bold text-sm text-white">Create Custom Watchlist Setup</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">Symbol</label>
+                      <input 
+                        type="text" 
+                        value={candSymbol} 
+                        onChange={(e) => setCandSymbol(e.target.value)} 
+                        placeholder="e.g. AAPL" 
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-[#ff6d5a]"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">Screen Class</label>
+                      <select 
+                        value={candScreen} 
+                        onChange={(e) => setCandScreen(e.target.value)}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-gray-300 focus:outline-none"
+                      >
+                        <option value="B">Screen B - Pullback</option>
+                        <option value="A">Screen A - Mean Reversion</option>
+                        <option value="F">Screen F - Darvas Breakout</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-2">
+                    <div>
+                      <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">Entry Low</label>
+                      <input 
+                        type="number" 
+                        step="any"
+                        value={candLow} 
+                        onChange={(e) => setCandLow(e.target.value)} 
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">Entry High</label>
+                      <input 
+                        type="number" 
+                        step="any"
+                        value={candHigh} 
+                        onChange={(e) => setCandHigh(e.target.value)} 
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">Stop Loss</label>
+                      <input 
+                        type="number" 
+                        step="any"
+                        value={candStop} 
+                        onChange={(e) => setCandStop(e.target.value)} 
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">R:R Target</label>
+                      <input 
+                        type="text" 
+                        value={candRR} 
+                        onChange={(e) => setCandRR(e.target.value)} 
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">Strategy Notes</label>
+                    <textarea 
+                      value={candNotes} 
+                      onChange={(e) => setCandNotes(e.target.value)} 
+                      rows={2}
+                      className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
+                      placeholder="Enter setup observations..."
+                    ></textarea>
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    className="bg-[#ff6d5a] hover:bg-[#ff8c7a] text-black text-xs font-bold rounded-lg px-4 py-2.5 w-full transition"
+                  >
+                    Add to Watchlist
+                  </button>
+                </form>
+              )}
+
+              {/* Watchlist Cards Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {sortedCandidates.map((cand) => {
+                  const symbol = cand.symbol || instruments.find(i => i.id === cand.instrument_id)?.symbol || 'UNKNOWN';
+                  const name = cand.name || instruments.find(i => i.id === cand.instrument_id)?.metadata?.name || `${symbol} Common Stock`;
+                  const price = ticks[symbol];
+                  
+                  const stopPrice = cand.suggested_stop;
+                  const entryLow = cand.entry_zone_low;
+                  const entryHigh = cand.entry_zone_high;
+                  
+                  const stopDiff = entryHigh - stopPrice;
+                  const targetPrice = entryHigh + (cand.rr_target * stopDiff);
+
+                  const tier = getCandidateTier(cand.notes);
+
+                  // Setup indicators relative to live ticks
+                  const inEntry = price !== undefined && price >= entryLow && price <= entryHigh;
+                  const aboveEntry = price !== undefined && price > entryHigh;
+
+                  // Percentages for the custom progress bar
+                  const totalRange = targetPrice - stopPrice;
+                  const entryLowPct = totalRange > 0 ? ((entryLow - stopPrice) / totalRange) * 100 : 25;
+                  const entryHighPct = totalRange > 0 ? ((entryHigh - stopPrice) / totalRange) * 100 : 35;
+                  
+                  let pricePct = -1;
+                  if (price !== undefined && totalRange > 0) {
+                    pricePct = Math.max(0, Math.min(100, ((price - stopPrice) / totalRange) * 100));
+                  }
+
+                  return (
+                    <div 
+                      key={cand.id} 
+                      className={`glass border p-5 rounded-2xl flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-lg relative overflow-hidden ${
+                        cand.status === 'active' 
+                          ? getTierBorderColor(tier) 
+                          : 'border-white/5 bg-[#12131e]/50 opacity-60'
+                      }`}
+                    >
+                      {/* Header with symbol, status, tier */}
+                      <div>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-extrabold text-xl text-white tracking-tight">{symbol}</span>
+                              <span className={`px-2 py-0.5 rounded text-[8px] uppercase font-bold ${getTierBadgeColor(tier)}`}>
+                                {tier}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-gray-500 font-medium truncate max-w-[180px] mt-0.5" title={name}>
+                              {name}
+                            </p>
+                          </div>
+
+                          <div className="flex flex-col items-end">
+                            <span className={`px-2 py-0.5 rounded text-[9px] uppercase font-bold font-mono tracking-wider ${
+                              cand.status === 'active' ? 'bg-emerald-500/10 text-emerald-400' :
+                              cand.status === 'triggered' ? 'bg-amber-500/10 text-amber-400' :
+                              'bg-white/5 text-gray-400'
+                            }`}>
+                              {cand.status}
+                            </span>
+                            <span className="text-[8px] text-gray-500 font-mono mt-1">
+                              {cand.created_ts.substr(11, 8) || '00:00:00'} UTC
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Strategy Info */}
+                        <div className="mt-4 flex items-center justify-between">
+                          <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Screen {cand.screen} Setup</span>
+                          <span className="text-[10px] text-sky-400 font-mono font-bold">{cand.rr_target}:1 R:R Target</span>
+                        </div>
+
+                        {/* Live Price and Entry Status */}
+                        <div className="mt-3 bg-black/30 rounded-xl p-3 border border-white/5 flex justify-between items-center">
+                          <div className="flex flex-col">
+                            <span className="text-[9px] text-gray-500 uppercase font-bold">Live Quote</span>
+                            <span className="text-base font-bold font-mono text-white mt-0.5">
+                              {price !== undefined ? `$${price.toFixed(2)}` : 'Awaiting Quote'}
+                            </span>
+                          </div>
+                          
+                          <div className="text-right">
+                            <span className="text-[9px] text-gray-500 uppercase font-bold">Signal State</span>
+                            <div className="mt-0.5">
+                              {price === undefined ? (
+                                <span className="text-[10px] text-gray-400 font-semibold font-mono">STANDBY</span>
+                              ) : inEntry ? (
+                                <span className="text-[10px] text-emerald-400 font-extrabold font-mono animate-pulse flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                  IN BUY ZONE
+                                </span>
+                              ) : aboveEntry ? (
+                                <span className="text-[10px] text-sky-400 font-bold font-mono">ABOVE ENTRY</span>
+                              ) : (
+                                <span className="text-[10px] text-amber-500 font-bold font-mono">BELOW ENTRY</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Interactive Visual Slider */}
+                        <div className="mt-5 space-y-1.5">
+                          <div className="relative h-1.5 bg-white/5 rounded-full overflow-visible">
+                            {/* Stop Loss Dot */}
+                            <div className="absolute left-0 -top-1 w-3.5 h-3.5 rounded-full bg-rose-600 border-2 border-[#0c0d14] shadow-md shadow-rose-900/30" title={`Stop: $${stopPrice.toFixed(2)}`}></div>
+                            
+                            {/* Entry Zone Range Highlight */}
+                            <div 
+                              className="absolute h-1.5 bg-emerald-500/25 border-x border-emerald-500/40"
+                              style={{ left: `${entryLowPct}%`, width: `${entryHighPct - entryLowPct}%` }}
+                            ></div>
+                            
+                            {/* Target Dot */}
+                            <div className="absolute right-0 -top-1 w-3.5 h-3.5 rounded-full bg-sky-600 border-2 border-[#0c0d14] shadow-md shadow-sky-900/30" title={`Target: $${targetPrice.toFixed(2)}`}></div>
+                            
+                            {/* Current Price Pin */}
+                            {pricePct >= 0 && (
+                              <div 
+                                className="absolute -top-1.5 -ml-2 transition-all duration-300 z-10 flex flex-col items-center"
+                                style={{ left: `${pricePct}%` }}
+                              >
+                                <span className="w-4 h-4 rounded-full bg-white border-2 border-emerald-500 shadow-md animate-pulse"></span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex justify-between text-[8px] font-mono text-gray-500 pt-0.5">
+                            <span>Stop: ${stopPrice.toFixed(2)}</span>
+                            <span className="text-emerald-400/80">Zone: ${entryLow.toFixed(2)}-${entryHigh.toFixed(2)}</span>
+                            <span>Target: ${targetPrice.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Strategy Notes / Footer */}
+                      <div className="mt-5 pt-3 border-t border-white/5">
+                        <p className="text-[11px] text-gray-400 font-sans italic leading-relaxed">
+                          {cand.notes.replace(/\(Tier:.*\)/, '').trim()}
+                        </p>
+                        <div className="flex justify-between items-center mt-3 text-[9px] text-gray-500">
+                          <span>Created: {cand.created_ts.substr(0, 10)}</span>
+                          <span className="font-mono">Setup ID: #{cand.id}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {sortedCandidates.length === 0 && (
+                  <div className="glass border border-dashed border-white/10 p-12 rounded-2xl text-center text-gray-500 text-sm col-span-full">
+                    No {candFilter !== 'all' ? candFilter : ''} swing watchlist items found.
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Universe Tab */}
         {activeTab === 'universe' && (
@@ -1054,7 +1327,7 @@ function App() {
               </div>
             ) : viewMode === 'grid' ? (
               /* Heatmap Grid View */
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 3xl:grid-cols-7 4xl:grid-cols-8 gap-4">
                 {sortedRotation.map((item) => {
                   const price = ticks[item.symbol] || item.price;
                   return (
@@ -1219,13 +1492,146 @@ function App() {
             )}
           </div>
         )}
+
+        {/* Settings Tab */}
+        {activeTab === 'settings' && (
+          <div className="space-y-6 max-w-4xl animate-fade-in">
+            <div>
+              <h2 className="text-2xl font-bold text-white">System Settings</h2>
+              <p className="text-xs text-gray-400 mt-1">
+                Configure trading system parameters, API connections, and real-time notification endpoints.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* WhatsApp Bot Configuration Card */}
+              <div className="glass border border-white/5 p-6 rounded-xl space-y-6 bg-black/20">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-lg text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.1)]">
+                    💬
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm text-white">WhatsApp Notifications</h3>
+                    <p className="text-[10px] text-gray-400">Configure BuilderBot alerts</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Toggle */}
+                  <div className="flex items-center justify-between p-3.5 bg-black/40 border border-white/5 rounded-lg">
+                    <div>
+                      <div className="text-xs font-bold text-white uppercase tracking-wider">Enable WhatsApp Alerts</div>
+                      <div className="text-[10px] text-gray-500 mt-0.5">Route real-time screener signals via WhatsApp</div>
+                    </div>
+                    <button
+                      onClick={() => setSettings(prev => ({ ...prev, whatsapp_enabled: prev.whatsapp_enabled === 'true' ? 'false' : 'true' }))}
+                      className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        settings.whatsapp_enabled === 'true' ? 'bg-[#ff6d5a]' : 'bg-white/10'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          settings.whatsapp_enabled === 'true' ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Recipient Input */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] text-gray-400 uppercase font-bold">Recipient Phone Number</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 351912345678"
+                      value={settings.whatsapp_recipient || ''}
+                      onChange={(e) => setSettings(prev => ({ ...prev, whatsapp_recipient: e.target.value }))}
+                      className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-[#ff6d5a] font-mono"
+                    />
+                    <p className="text-[9px] text-gray-500">Include country code without + or spaces (e.g. 14155552671)</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Engine System Stats & Help Card */}
+              <div className="glass border border-white/5 p-6 rounded-xl space-y-6 bg-black/20 flex flex-col justify-between">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-[#825aff]/10 border border-[#825aff]/20 flex items-center justify-center text-lg text-[#825aff] shadow-[0_0_15px_rgba(130,90,255,0.1)]">
+                      🤖
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-sm text-white">WhatsApp Bot Commands</h3>
+                      <p className="text-[10px] text-gray-400">Control the engine remotely on WhatsApp</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-black/30 border border-white/5 rounded-lg p-4 space-y-2.5 font-mono text-[10px]">
+                    <div className="flex justify-between text-gray-400 border-b border-white/5 pb-1">
+                      <span>Command</span>
+                      <span>Description</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#ff6d5a]">/regime</span>
+                      <span className="text-gray-400 text-right">Get current market regime</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#ff6d5a]">/candidates</span>
+                      <span className="text-gray-400 text-right">List active swing setups</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#ff6d5a]">/alerts</span>
+                      <span className="text-gray-400 text-right">List recent signals</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#ff6d5a]">/act &lt;id&gt;</span>
+                      <span className="text-gray-400 text-right">Mark alert as acted-on</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-white/5 flex justify-end">
+                  <button
+                    onClick={async () => {
+                      try {
+                        const response = await fetch('/api/settings', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify(settings)
+                        });
+                        if (response.ok) {
+                          showToast('Settings saved successfully', 'success');
+                          fetchData();
+                        } else {
+                          showToast('Failed to save settings', 'error');
+                        }
+                      } catch (e) {
+                        console.error('Failed to save settings:', e);
+                        showToast('Error connecting to backend', 'error');
+                      }
+                    }}
+                    className="bg-[#ff6d5a] hover:bg-[#ff8c7a] text-black text-xs font-bold rounded-lg px-6 py-2.5 transition shadow-[0_0_15px_rgba(255,109,90,0.2)]"
+                  >
+                    Save Configuration
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
-      {/* Footer */}
-      <footer className="glass border-t border-white/5 py-4 px-6 text-center text-xs text-gray-500">
-        © 2026 Tachyon Ops. Built on high-performance C++ & SQLite3.
+      {/* Status Bar */}
+      <footer className="h-7 px-4 bg-[#090b11] border-t border-white/5 flex items-center justify-between text-[10px] text-gray-500 font-mono shrink-0">
+        <div>© 2026 Tachyon Ops</div>
+        <div>C++ Multi-Screen Engine v3.9</div>
+        <div className="flex items-center gap-3">
+          <span>DB: SQLite3</span>
+          <span className="text-gray-700">|</span>
+          <span className="text-emerald-400/80">API Connected</span>
+        </div>
       </footer>
     </div>
+  </div>
   );
 }
 

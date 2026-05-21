@@ -40,12 +40,8 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/chriskohlhoff/asio.git
     GIT_TAG asio-1-30-2
 )
-FetchContent_GetProperties(asio)
-if(NOT asio_POPULATED)
-    FetchContent_Populate(asio)
-    set(ASIO_INCLUDE_DIR "${asio_SOURCE_DIR}/asio/include" CACHE PATH "Asio include directory" FORCE)
-    include_directories(${ASIO_INCLUDE_DIR})
-endif()
+FetchContent_MakeAvailable(asio)
+include_directories(SYSTEM "${asio_SOURCE_DIR}/asio/include")
 
 # 4. Fetch Crow (HTTP & WebSocket server)
 FetchContent_Declare(
@@ -57,6 +53,7 @@ FetchContent_Declare(
 set(CROW_BUILD_EXAMPLES OFF CACHE BOOL "Build Crow examples" FORCE)
 set(CROW_BUILD_TESTS OFF CACHE BOOL "Build Crow tests" FORCE)
 FetchContent_MakeAvailable(crow)
+set_target_properties(Crow PROPERTIES INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "$<BUILD_INTERFACE:${crow_SOURCE_DIR}/include>")
 
 # 5. Fetch Webview
 FetchContent_Declare(
@@ -82,6 +79,7 @@ set(SOURCE_FILES
     src/web/http_server.cpp
     src/core/regime_classifier.cpp
     src/screens/screen_d.cpp
+    src/screens/screen_b.cpp
 )
 
 # Executable target

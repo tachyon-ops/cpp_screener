@@ -13,6 +13,7 @@
 #include "trader/web/http_server.hpp"
 #include "trader/core/regime_classifier.hpp"
 #include "trader/screens/screen_d.hpp"
+#include "trader/screens/screen_b.hpp"
 #include <webview.h>
 
 
@@ -80,6 +81,67 @@ int main() {
         existing_instruments = store->get_instruments();
     }
 
+    // Update stock seeding metadata with sector ETFs and next earnings dates
+    std::cout << "[Engine] Checking/updating Stock metadata for Screen B..." << std::endl;
+    std::string today_date = get_current_utc_date();
+    
+    auto add_days = [](const std::string& date_str, int days) -> std::string {
+        struct tm t = {};
+        if (sscanf(date_str.c_str(), "%d-%d-%d", &t.tm_year, &t.tm_mon, &t.tm_mday) == 3) {
+            t.tm_year -= 1900;
+            t.tm_mon -= 1;
+            t.tm_mday += days;
+            mktime(&t);
+            char buf[32];
+            strftime(buf, sizeof(buf), "%Y-%m-%d", &t);
+            return buf;
+        }
+        return date_str;
+    };
+
+    for (auto& inst : existing_instruments) {
+        if (inst.asset_class == "Stock") {
+            nlohmann::json meta = nlohmann::json::object();
+            if (!inst.metadata_json.empty()) {
+                try {
+                    meta = nlohmann::json::parse(inst.metadata_json);
+                } catch (...) {}
+            }
+            meta["asset_type"] = "Stock";
+            
+            bool updated = false;
+            if (inst.symbol == "AAPL") {
+                meta["name"] = "Apple Inc.";
+                meta["sector_etf_symbol"] = "XLK";
+                meta["next_earnings_date"] = add_days(today_date, 30);
+                updated = true;
+            } else if (inst.symbol == "MSFT") {
+                meta["name"] = "Microsoft Corp.";
+                meta["sector_etf_symbol"] = "XLK";
+                meta["next_earnings_date"] = add_days(today_date, 3); // earnings risk (within 5 trading / 7 calendar days)
+                updated = true;
+            } else if (inst.symbol == "TSLA") {
+                meta["name"] = "Tesla Inc.";
+                meta["sector_etf_symbol"] = "XLY";
+                meta["next_earnings_date"] = add_days(today_date, 45);
+                updated = true;
+            } else if (inst.symbol == "NVDA") {
+                meta["name"] = "NVIDIA Corp.";
+                meta["sector_etf_symbol"] = "XLK";
+                meta["next_earnings_date"] = add_days(today_date, 60);
+                updated = true;
+            }
+            
+            if (updated) {
+                inst.metadata_json = meta.dump();
+                store->add_instrument(inst);
+                std::cout << "[Engine] Updated metadata for stock " << inst.symbol << ": " << inst.metadata_json << std::endl;
+            }
+        }
+    }
+    // Refetch instruments to ensure we have the updated ones
+    existing_instruments = store->get_instruments();
+
     // 3. Initialize Saxo Broker Adapter
     broker::SaxoBrokerConfig broker_config;
     broker_config.token_db_path = "./data/tokens.db";
@@ -96,20 +158,21 @@ int main() {
                   << "). Running in simulated-quote mode." << std::endl;
     }
 
-    // 3.5 Initialize RegimeClassifier & ScreenD
+    // 3.5 Initialize RegimeClassifier, ScreenD & ScreenB
     auto classifier = std::make_shared<core::RegimeClassifier>(store);
     auto screen_d = std::make_shared<screens::ScreenD>(store);
+    auto screen_b = std::make_shared<screens::ScreenB>(store);
 
     // 4. Initialize and start HTTP & WebSocket Server
     // Serving built React files from "./ui/dist"
-    auto http_server = std::make_shared<web::HttpServer>(store, saxo_adapter, classifier, screen_d, "./ui/dist", 8080);
+    auto http_server = std::make_shared<web::HttpServer>(store, saxo_adapter, classifier, screen_d, screen_b, "./ui/dist", 8080);
     http_server->start();
 
     // Prime the data with an initial evaluation
-    std::string today_date = get_current_utc_date();
     std::cout << "[Engine] Seeding/Calculating initial EOD regime and Screen D rotation board..." << std::endl;
     classifier->evaluate(today_date, 14.5, 3.25, 0.76, 520.0);
     screen_d->evaluate(today_date);
+    screen_b->evaluate(today_date);
 
     // 5. Seed sample regime & alerts if tables are empty, so the UI is immediately wowed
     if (store->get_alerts(1).empty()) {
@@ -181,7 +244,7 @@ int main() {
     }
 
     // 7. Background screener thread to periodically evaluate regimes & screens
-    std::thread screener_thread([store, http_server, classifier, screen_d]() {
+    std::thread screener_thread([store, http_server, classifier, screen_d, screen_b]() {
         std::random_device rd;
         std::mt19937 gen(rd());
         std::normal_distribution<> vix_walk(0.0, 0.4);
@@ -219,6 +282,7 @@ int main() {
             // Run calculations
             core::Regime regime = classifier->evaluate(date, vix, hy_oas, breadth, spy_price);
             screen_d->evaluate(date);
+            screen_b->evaluate(date);
 
             // Fetch the updated log to broadcast
             auto logs = store->get_regime_log(1);
