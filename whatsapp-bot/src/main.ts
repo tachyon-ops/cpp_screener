@@ -288,6 +288,22 @@ function connectWebSocket(botInstance: any, provider: any) {
 
                 console.log(`[WS] Forwarding alert ${alert.id} to ${jid}`);
                 await sendWhatsAppMessage(botInstance, provider, jid, text);
+            } else if (message.type === 'test_whatsapp') {
+                const testData = message.data;
+                console.log(`[WS] Received live test alert from C++ engine:`, testData);
+
+                const recipient = testData.whatsapp_recipient || '';
+                if (!recipient) {
+                    console.log(`[WS] Test alert bypassed: No recipient phone number configured`);
+                    return;
+                }
+
+                const cleanRecipient = recipient.replace(/\D/g, '');
+                const jid = `${cleanRecipient}@s.whatsapp.net`;
+                const text = testData.text || `⚡ *Tachyon Screener* ⚡\n🤖 *WhatsApp Bot Test Connection*\n✅ Connection verified successfully!`;
+
+                console.log(`[WS] Forwarding test alert to ${jid}`);
+                await sendWhatsAppMessage(botInstance, provider, jid, text);
             }
         } catch (e: any) {
             console.error(`[WS] Failed to handle WebSocket message:`, e.message);

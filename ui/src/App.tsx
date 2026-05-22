@@ -184,6 +184,8 @@ function App() {
   const [showAppKey, setShowAppKey] = useState(false);
   const [showAppSecret, setShowAppSecret] = useState(false);
   const [showTgToken, setShowTgToken] = useState(false);
+  const [testingTelegram, setTestingTelegram] = useState(false);
+  const [testingWhatsapp, setTestingWhatsapp] = useState(false);
   const [showAccessToken, setShowAccessToken] = useState(false);
   const [showRefreshToken, setShowRefreshToken] = useState(false);
   
@@ -2344,6 +2346,58 @@ function App() {
                     />
                     <p className="text-[9px] text-gray-500">Include country code without + or spaces (e.g. 14155552671)</p>
                   </div>
+
+                  {/* Test Connection Button */}
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      disabled={testingWhatsapp}
+                      onClick={async () => {
+                        if (!settings.whatsapp_recipient) {
+                          showToast('Please enter a recipient phone number first', 'error');
+                          return;
+                        }
+                        setTestingWhatsapp(true);
+                        try {
+                          const res = await fetch('/api/test_notification', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              type: 'whatsapp',
+                              whatsapp_recipient: settings.whatsapp_recipient
+                            })
+                          });
+                          const data = await res.json();
+                          if (res.ok) {
+                            showToast(data.message || 'WhatsApp test message triggered', 'success');
+                          } else {
+                            showToast(data.error || 'Failed to send WhatsApp test message', 'error');
+                          }
+                        } catch (e) {
+                          showToast('Error connecting to server', 'error');
+                        } finally {
+                          setTestingWhatsapp(false);
+                        }
+                      }}
+                      className={`w-full text-xs font-bold py-2 px-4 rounded-lg border flex items-center justify-center gap-2 transition-all duration-300 ${
+                        testingWhatsapp 
+                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400/50 cursor-not-allowed'
+                        : 'bg-emerald-500/5 hover:bg-emerald-500/10 border-emerald-500/20 hover:border-emerald-500/40 text-emerald-400 active:scale-[0.98]'
+                      }`}
+                    >
+                      {testingWhatsapp ? (
+                        <>
+                          <svg className="animate-spin h-3 w-3 text-emerald-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Testing Connection...
+                        </>
+                      ) : (
+                        'Test Connection'
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -2475,6 +2529,65 @@ function App() {
                   <p className="text-[9px] text-gray-500">
                     Use Telegram commands in your chat (e.g. <code>/set_premium</code>) to bind automatically, or enter the ID manually.
                   </p>
+
+                  {/* Test Connection Button */}
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      disabled={testingTelegram}
+                      onClick={async () => {
+                        if (!settings.tg_bot_token) {
+                          showToast('Please enter a bot token first', 'error');
+                          return;
+                        }
+                        if (!settings.tg_chat_premium && !settings.tg_chat_opportunity && !settings.tg_chat_digest) {
+                          showToast('Please configure at least one Chat ID', 'error');
+                          return;
+                        }
+                        setTestingTelegram(true);
+                        try {
+                          const res = await fetch('/api/test_notification', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              type: 'telegram',
+                              tg_bot_token: settings.tg_bot_token,
+                              tg_chat_premium: settings.tg_chat_premium,
+                              tg_chat_opportunity: settings.tg_chat_opportunity,
+                              tg_chat_digest: settings.tg_chat_digest
+                            })
+                          });
+                          const data = await res.json();
+                          if (res.ok) {
+                            showToast(data.message || 'Telegram test message sent', 'success');
+                          } else {
+                            showToast(data.error || 'Failed to send Telegram test message', 'error');
+                          }
+                        } catch (e) {
+                          showToast('Error connecting to server', 'error');
+                        } finally {
+                          setTestingTelegram(false);
+                        }
+                      }}
+                      className={`w-full text-xs font-bold py-2 px-4 rounded-lg border flex items-center justify-center gap-2 transition-all duration-300 ${
+                        testingTelegram 
+                        ? 'bg-blue-500/10 border-blue-500/20 text-blue-400/50 cursor-not-allowed'
+                        : 'bg-blue-500/5 hover:bg-blue-500/10 border-blue-500/20 hover:border-blue-500/40 text-blue-400 active:scale-[0.98]'
+                      }`}
+                    >
+                      {testingTelegram ? (
+                        <>
+                          <svg className="animate-spin h-3 w-3 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Testing Connection...
+                        </>
+                      ) : (
+                        'Test Connection'
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
 

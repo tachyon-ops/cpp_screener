@@ -10,6 +10,7 @@
 #include "trader/storage/time_series_store.hpp"
 #include "trader/storage/token_store.hpp"
 #include <crow.h>
+#include <httplib.h>
 #include <nlohmann/json.hpp>
 #include <iostream>
 #include <fstream>
@@ -761,6 +762,126 @@ HttpServer::HttpServer(
         } catch (const std::exception& e) {
             nlohmann::json err = {{"error", e.what()}};
             return crow::response(500, err.dump());
+        }
+    });
+
+    // POST /api/test_notification
+    CROW_ROUTE(pimpl_->app, "/api/test_notification").methods(crow::HTTPMethod::POST)([this](const crow::request& req) {
+        try {
+            auto body = nlohmann::json::parse(req.body);
+            std::string type = body.at("type").get<std::string>();
+            if (type == "telegram") {
+                std::string token = body.value("tg_bot_token", "");
+                if (token.empty()) {
+                    return crow::response(400, nlohmann::json({{"error", "Telegram bot token is required"}}).dump());
+                }
+
+                // If the token is masked, reload it from db settings
+                if (token.find("••••") != std::string::npos) {
+                    auto db_token = pimpl_->store->get_setting("tg_bot_token");
+                    if (db_token && !db_token->empty()) {
+                        token = *db_token;
+                    }
+                }
+
+                std::vector<std::string> chat_ids;
+                if (body.contains("tg_chat_premium")) {
+                    std::string c = body["tg_chat_premium"].get<std::string>();
+                    if (!c.empty()) chat_ids.push_back(c);
+                }
+                if (body.contains("tg_chat_opportunity")) {
+                    std::string c = body["tg_chat_opportunity"].get<std::string>();
+                    if (!c.empty()) chat_ids.push_back(c);
+                }
+                if (body.contains("tg_chat_digest")) {
+                    std::string c = body["tg_chat_digest"].get<std::string>();
+                    if (!c.empty()) chat_ids.push_back(c);
+                }
+
+                if (chat_ids.empty()) {
+                    return crow::response(400, nlohmann::json({{"error", "At least one chat ID (Premium, Opportunity, or Digest) must be configured"}}).dump());
+                }
+
+                httplib::Client cli("https://api.telegram.org");
+                cli.set_connection_timeout(std::chrono::seconds(10));
+                cli.set_read_timeout(std::chrono::seconds(15));
+
+                // Construct a timestamp
+                auto now_time = std::chrono::system_clock::now();
+                auto time_val = std::chrono::system_clock::to_time_t(now_time);
+                std::stringstream ss;
+                ss << std::put_time(std::gmtime(&time_val), "%Y-%m-%dT%H:%M:%SZ");
+                std::string ts = ss.str();
+
+                std::string test_msg = "⚡ <b>Tachyon Screener</b> ⚡\n"
+                                       "🤖 <b>Telegram Bot Test Connection</b>\n"
+                                       "✅ Connection verified successfully!\n"
+                                       "📅 <i>Time: " + ts + " UTC</i>";
+
+                int success_count = 0;
+                std::string last_err = "";
+
+                for (const auto& chat_id : chat_ids) {
+                    nlohmann::json req_body = {
+                        {"chat_id", chat_id},
+                        {"text", test_msg},
+                        {"parse_mode", "HTML"}
+                    };
+                    std::string path = "/bot" + token + "/sendMessage";
+                    httplib::Headers headers = {{"Content-Type", "application/json"}};
+                    auto res = cli.Post(path.c_str(), headers, req_body.dump(), "application/json");
+                    if (res && res->status == 200) {
+                        auto res_json = nlohmann::json::parse(res->body);
+                        if (res_json.value("ok", false)) {
+                            success_count++;
+                        } else {
+                            last_err = "Telegram returned error: " + res->body;
+                        }
+                    } else {
+                        if (res) {
+                            last_err = "HTTP status: " + std::to_string(res->status) + ", Body: " + res->body;
+                        } else {
+                            last_err = "Failed to connect to Telegram API";
+                        }
+                    }
+                }
+
+                if (success_count > 0) {
+                    nlohmann::json res_json = {
+                        {"status", "success"},
+                        {"message", "Test message sent to " + std::to_string(success_count) + " chat(s)."}
+                    };
+                    return crow::response(200, res_json.dump());
+                } else {
+                    return crow::response(400, nlohmann::json({{"error", "Failed to send test message: " + last_err}}).dump());
+                }
+            } else if (type == "whatsapp") {
+                std::string recipient = body.value("whatsapp_recipient", "");
+                if (recipient.empty()) {
+                    return crow::response(400, nlohmann::json({{"error", "Recipient phone number is required"}}).dump());
+                }
+
+                // Send test trigger to WhatsApp Bot via WebSocket
+                nlohmann::json ws_msg = {
+                    {"type", "test_whatsapp"},
+                    {"data", {
+                        {"whatsapp_recipient", recipient},
+                        {"text", "⚡ *Tachyon Screener* ⚡\n🤖 *WhatsApp Bot Test Connection*\n✅ Connection verified successfully!"}
+                    }}
+                };
+
+                pimpl_->broadcast(ws_msg.dump());
+
+                nlohmann::json res_json = {
+                    {"status", "success"},
+                    {"message", "Test message trigger broadcasted to WhatsApp bot."}
+                };
+                return crow::response(200, res_json.dump());
+            } else {
+                return crow::response(400, nlohmann::json({{"error", "Invalid notification type"}}).dump());
+            }
+        } catch (const std::exception& e) {
+            return crow::response(500, nlohmann::json({{"error", e.what()}}).dump());
         }
     });
 
