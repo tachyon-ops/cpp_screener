@@ -18,6 +18,9 @@
 #include <thread>
 #include <mutex>
 #include <unordered_set>
+#include <sstream>
+#include <iomanip>
+#include <chrono>
 
 namespace trader {
 namespace web {
@@ -41,6 +44,16 @@ struct HttpServer::Impl {
     std::thread server_thread;
     std::mutex ws_mutex;
     std::unordered_set<crow::websocket::connection*> connections;
+
+    // WhatsApp bot connection status (in-memory, updated via POST from the Node.js bot)
+    struct WhatsAppStatus {
+        std::string state = "disconnected";  // "disconnected" | "awaiting_pairing" | "connected" | "error"
+        std::string pairing_code = "";
+        std::string error_message = "";
+        std::string updated_at = "";
+    };
+    WhatsAppStatus wa_status;
+    std::mutex wa_status_mutex;
 
     Impl(
         std::shared_ptr<persistence::SQLiteStore> s,
@@ -880,6 +893,51 @@ HttpServer::HttpServer(
             } else {
                 return crow::response(400, nlohmann::json({{"error", "Invalid notification type"}}).dump());
             }
+        } catch (const std::exception& e) {
+            return crow::response(500, nlohmann::json({{"error", e.what()}}).dump());
+        }
+    });
+
+    // GET /api/whatsapp_status
+    CROW_ROUTE(pimpl_->app, "/api/whatsapp_status")([this]() {
+        try {
+            std::lock_guard<std::mutex> lock(pimpl_->wa_status_mutex);
+            nlohmann::json res = {
+                {"state", pimpl_->wa_status.state},
+                {"pairing_code", pimpl_->wa_status.pairing_code},
+                {"error_message", pimpl_->wa_status.error_message},
+                {"updated_at", pimpl_->wa_status.updated_at}
+            };
+            return crow::response(200, res.dump());
+        } catch (const std::exception& e) {
+            return crow::response(500, nlohmann::json({{"error", e.what()}}).dump());
+        }
+    });
+
+    // POST /api/whatsapp_status
+    CROW_ROUTE(pimpl_->app, "/api/whatsapp_status").methods(crow::HTTPMethod::POST)([this](const crow::request& req) {
+        try {
+            auto body = nlohmann::json::parse(req.body);
+            std::string state = body.value("state", "");
+            if (state.empty()) {
+                return crow::response(400, nlohmann::json({{"error", "Missing 'state' field"}}).dump());
+            }
+
+            auto now_time = std::chrono::system_clock::now();
+            auto time_val = std::chrono::system_clock::to_time_t(now_time);
+            std::stringstream ss;
+            ss << std::put_time(std::gmtime(&time_val), "%Y-%m-%dT%H:%M:%SZ");
+
+            {
+                std::lock_guard<std::mutex> lock(pimpl_->wa_status_mutex);
+                pimpl_->wa_status.state = state;
+                pimpl_->wa_status.pairing_code = body.value("pairing_code", "");
+                pimpl_->wa_status.error_message = body.value("error_message", "");
+                pimpl_->wa_status.updated_at = ss.str();
+            }
+
+            std::cout << "[HttpServer] WhatsApp status updated: " << state << std::endl;
+            return crow::response(200, nlohmann::json({{"status", "ok"}}).dump());
         } catch (const std::exception& e) {
             return crow::response(500, nlohmann::json({{"error", e.what()}}).dump());
         }

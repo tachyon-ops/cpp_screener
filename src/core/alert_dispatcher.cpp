@@ -568,14 +568,12 @@ void AlertDispatcher::process_queued_alerts(std::vector<Alert>& alerts) {
             }
 
             // Generate dynamic inline buttons
-            nlohmann::json inline_kb = {
-                {"inline_keyboard", {
-                    {
-                        {{"text", "Lead with " + leader.symbol}, {"callback_data", "acting:" + std::to_string(leader_id)}},
-                        {{"text", "Skip Cluster"}, {"callback_data", "skip:" + std::to_string(leader_id)}}
-                    }
-                }}
-            };
+            nlohmann::json btn_lead = nlohmann::json::object({{"text", "Lead with " + leader.symbol}, {"callback_data", "acting:" + std::to_string(leader_id)}});
+            nlohmann::json btn_skip = nlohmann::json::object({{"text", "Skip Cluster"}, {"callback_data", "skip:" + std::to_string(leader_id)}});
+            nlohmann::json inline_kb;
+            inline_kb["inline_keyboard"] = nlohmann::json::array({
+                nlohmann::json::array({btn_lead, btn_skip})
+            });
 
             // Send to Premium telegram channel
             send_to_channels(leader, ss.str(), inline_kb.dump());
@@ -699,19 +697,16 @@ void AlertDispatcher::process_queued_alerts(std::vector<Alert>& alerts) {
            << "Size for 2% risk: " << alert.size_2pct.units << " units ($" << (int)alert.size_2pct.cost << ", " << alert.size_2pct.pct_account << "% account)" << (alert.size_2pct.capped ? " — <b>CAPPED</b>" : "") << "\n"
            << "Size for 5% risk: " << alert.size_5pct.units << " units ($" << (int)alert.size_5pct.cost << ", " << alert.size_5pct.pct_account << "% account)" << (alert.size_5pct.capped ? " — <b>CAPPED</b>" : "") << "\n";
 
-        nlohmann::json markup = {
-            {"inline_keyboard", {
-                {
-                    {{"text", "👀 Saw it"}, {"callback_data", "saw_it:" + std::to_string(db_id)}},
-                    {{"text", "⚡ Acting"}, {"callback_data", "acting:" + std::to_string(db_id)}}
-                },
-                {
-                    {{"text", "❌ Skip"}, {"callback_data", "skip:" + std::to_string(db_id)}},
-                    {{"text", "⏸ Defer"}, {"callback_data", "defer:" + std::to_string(db_id)}},
-                    {{"text", "📝 Note"}, {"callback_data", "note:" + std::to_string(db_id)}}
-                }
-            }}
-        };
+        nlohmann::json btn_saw   = nlohmann::json::object({{"text", "👀 Saw it"}, {"callback_data", "saw_it:" + std::to_string(db_id)}});
+        nlohmann::json btn_act   = nlohmann::json::object({{"text", "⚡ Acting"}, {"callback_data", "acting:" + std::to_string(db_id)}});
+        nlohmann::json btn_skip  = nlohmann::json::object({{"text", "❌ Skip"}, {"callback_data", "skip:" + std::to_string(db_id)}});
+        nlohmann::json btn_defer = nlohmann::json::object({{"text", "⏸ Defer"}, {"callback_data", "defer:" + std::to_string(db_id)}});
+        nlohmann::json btn_note  = nlohmann::json::object({{"text", "📝 Note"}, {"callback_data", "note:" + std::to_string(db_id)}});
+        nlohmann::json markup;
+        markup["inline_keyboard"] = nlohmann::json::array({
+            nlohmann::json::array({btn_saw, btn_act}),
+            nlohmann::json::array({btn_skip, btn_defer, btn_note})
+        });
 
         send_to_channels(alert, ss.str(), markup.dump());
     }

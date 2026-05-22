@@ -102,6 +102,18 @@ struct DbAlertResponse {
     std::string note_text;
 };
 
+struct DbNotificationSubscriber {
+    int64_t id = 0;
+    std::string platform;          // "telegram" | "whatsapp"
+    std::string identifier;        // chat_id (TG) or phone digits (WA)
+    std::string name;              // Display name: "My DMs", "Team Channel", "Nuno"
+    bool active = true;
+    bool tier_premium = true;
+    bool tier_opportunity = true;
+    bool tier_digest = true;
+    std::string created_at;        // ISO 8601
+};
+
 class SQLiteStore {
 public:
     explicit SQLiteStore(const std::string& db_path = "./data/screener.db");
@@ -151,6 +163,14 @@ public:
     void set_setting(const std::string& key, const std::string& value);
     std::optional<std::string> get_setting(const std::string& key);
     std::vector<std::pair<std::string, std::string>> get_all_settings();
+
+    // Notification subscriber management
+    int64_t add_subscriber(const DbNotificationSubscriber& sub);
+    void update_subscriber(const DbNotificationSubscriber& sub);
+    void remove_subscriber(int64_t id);
+    std::vector<DbNotificationSubscriber> get_subscribers(const std::string& platform = "");
+    std::vector<DbNotificationSubscriber> get_active_subscribers_for_tier(
+        const std::string& platform, const std::string& tier);
 
     // Asynchronous Batched Writes
     void add_instrument_async(const DbInstrument& inst);

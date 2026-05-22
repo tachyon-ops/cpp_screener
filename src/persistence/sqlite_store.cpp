@@ -238,12 +238,25 @@ void SQLiteStore::init_schema() {
         "  key TEXT PRIMARY KEY,"
         "  value TEXT NOT NULL"
         ");"
+        "CREATE TABLE IF NOT EXISTS notification_subscribers ("
+        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  platform TEXT NOT NULL,"
+        "  identifier TEXT NOT NULL,"
+        "  name TEXT DEFAULT '',"
+        "  active INTEGER DEFAULT 1,"
+        "  tier_premium INTEGER DEFAULT 1,"
+        "  tier_opportunity INTEGER DEFAULT 1,"
+        "  tier_digest INTEGER DEFAULT 1,"
+        "  created_at TEXT NOT NULL"
+        ");"
         "CREATE INDEX IF NOT EXISTS idx_alerts_ts ON alerts(ts);"
         "CREATE INDEX IF NOT EXISTS idx_alerts_screen ON alerts(screen);"
         "CREATE INDEX IF NOT EXISTS idx_bars_daily_date ON bars_daily(date);"
         "CREATE INDEX IF NOT EXISTS idx_positions_alert ON positions(alert_id);"
         "CREATE INDEX IF NOT EXISTS idx_positions_status ON positions(status);"
-        "CREATE INDEX IF NOT EXISTS idx_alert_responses_alert ON alert_responses(alert_id);";
+        "CREATE INDEX IF NOT EXISTS idx_alert_responses_alert ON alert_responses(alert_id);"
+        "CREATE INDEX IF NOT EXISTS idx_subscribers_platform ON notification_subscribers(platform);"
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_subscribers_platform_identifier ON notification_subscribers(platform, identifier);";
 
     char* errMsg = nullptr;
     int rc = sqlite3_exec(pimpl_->db, sql, nullptr, nullptr, &errMsg);
@@ -252,6 +265,9 @@ void SQLiteStore::init_schema() {
         sqlite3_free(errMsg);
         throw std::runtime_error("Failed to create tables: " + err);
     }
+
+    // Auto-migrate old settings into notification_subscribers table
+    migrate_legacy_subscribers();
 }
 
 void SQLiteStore::add_instrument(const DbInstrument& inst) {
@@ -946,6 +962,245 @@ std::vector<std::pair<std::string, std::string>> SQLiteStore::get_all_settings()
             const char* key = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
             const char* val = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
             list.push_back({key ? key : "", val ? val : ""});
+        }
+    }
+    sqlite3_finalize(stmt);
+    return list;
+}
+
+// --- Notification Subscriber Management ---
+
+void SQLiteStore::migrate_legacy_subscribers() {
+    // Check if migration already happened
+    {
+        const char* check_sql = "SELECT COUNT(*) FROM notification_subscribers;";
+        sqlite3_stmt* stmt = nullptr;
+        if (sqlite3_prepare_v2(pimpl_->db, check_sql, -1, &stmt, nullptr) == SQLITE_OK) {
+            if (sqlite3_step(stmt) == SQLITE_ROW && sqlite3_column_int(stmt, 0) > 0) {
+                sqlite3_finalize(stmt);
+                return; // Already have subscribers, skip migration
+            }
+        }
+        sqlite3_finalize(stmt);
+    }
+
+    // Get current timestamp
+    auto now = std::chrono::system_clock::now();
+    auto time_val = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ts_ss;
+    ts_ss << std::put_time(std::gmtime(&time_val), "%Y-%m-%dT%H:%M:%SZ");
+    std::string now_ts = ts_ss.str();
+
+    // Migrate WhatsApp recipient
+    {
+        const char* sql = "SELECT value FROM settings WHERE key = 'whatsapp_recipient';";
+        sqlite3_stmt* stmt = nullptr;
+        if (sqlite3_prepare_v2(pimpl_->db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+            if (sqlite3_step(stmt) == SQLITE_ROW) {
+                const char* val = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+                if (val && std::string(val).size() > 0) {
+                    std::string phone = val;
+                    // Strip non-digits
+                    std::string digits;
+                    for (char c : phone) {
+                        if (std::isdigit(c)) digits += c;
+                    }
+                    if (!digits.empty()) {
+                        sqlite3_finalize(stmt);
+                        const char* ins_sql = "INSERT OR IGNORE INTO notification_subscribers "
+                            "(platform, identifier, name, active, tier_premium, tier_opportunity, tier_digest, created_at) "
+                            "VALUES ('whatsapp', ?, 'Owner', 1, 1, 1, 1, ?);";
+                        sqlite3_stmt* ins_stmt = nullptr;
+                        if (sqlite3_prepare_v2(pimpl_->db, ins_sql, -1, &ins_stmt, nullptr) == SQLITE_OK) {
+                            sqlite3_bind_text(ins_stmt, 1, digits.c_str(), -1, SQLITE_TRANSIENT);
+                            sqlite3_bind_text(ins_stmt, 2, now_ts.c_str(), -1, SQLITE_TRANSIENT);
+                            sqlite3_step(ins_stmt);
+                        }
+                        sqlite3_finalize(ins_stmt);
+                        std::cout << "[SQLiteStore] Migrated WhatsApp subscriber: " << digits << std::endl;
+                        stmt = nullptr; // Already finalized above
+                    }
+                }
+            }
+        }
+        if (stmt) sqlite3_finalize(stmt);
+    }
+
+    // Migrate Telegram chat IDs — collect unique chat IDs with their tier associations
+    std::map<std::string, std::tuple<bool, bool, bool>> tg_chats; // chat_id -> (premium, opportunity, digest)
+    for (const auto& [setting_key, tier_idx] : std::vector<std::pair<std::string, int>>{
+        {"tg_chat_premium", 0}, {"tg_chat_opportunity", 1}, {"tg_chat_digest", 2}
+    }) {
+        const char* sql = "SELECT value FROM settings WHERE key = ?;";
+        sqlite3_stmt* stmt = nullptr;
+        if (sqlite3_prepare_v2(pimpl_->db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+            sqlite3_bind_text(stmt, 1, setting_key.c_str(), -1, SQLITE_TRANSIENT);
+            if (sqlite3_step(stmt) == SQLITE_ROW) {
+                const char* val = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+                if (val && std::string(val).size() > 0) {
+                    std::string chat_id = val;
+                    if (tg_chats.find(chat_id) == tg_chats.end()) {
+                        tg_chats[chat_id] = {false, false, false};
+                    }
+                    auto& tiers = tg_chats[chat_id];
+                    if (tier_idx == 0) std::get<0>(tiers) = true;
+                    if (tier_idx == 1) std::get<1>(tiers) = true;
+                    if (tier_idx == 2) std::get<2>(tiers) = true;
+                }
+            }
+        }
+        sqlite3_finalize(stmt);
+    }
+
+    for (const auto& [chat_id, tiers] : tg_chats) {
+        const char* ins_sql = "INSERT OR IGNORE INTO notification_subscribers "
+            "(platform, identifier, name, active, tier_premium, tier_opportunity, tier_digest, created_at) "
+            "VALUES ('telegram', ?, 'Chat', 1, ?, ?, ?, ?);";
+        sqlite3_stmt* ins_stmt = nullptr;
+        if (sqlite3_prepare_v2(pimpl_->db, ins_sql, -1, &ins_stmt, nullptr) == SQLITE_OK) {
+            sqlite3_bind_text(ins_stmt, 1, chat_id.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_int(ins_stmt, 2, std::get<0>(tiers) ? 1 : 0);
+            sqlite3_bind_int(ins_stmt, 3, std::get<1>(tiers) ? 1 : 0);
+            sqlite3_bind_int(ins_stmt, 4, std::get<2>(tiers) ? 1 : 0);
+            sqlite3_bind_text(ins_stmt, 5, now_ts.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_step(ins_stmt);
+        }
+        sqlite3_finalize(ins_stmt);
+        std::cout << "[SQLiteStore] Migrated Telegram subscriber: " << chat_id << std::endl;
+    }
+}
+
+int64_t SQLiteStore::add_subscriber(const DbNotificationSubscriber& sub) {
+    std::lock_guard<std::mutex> lock(pimpl_->db_mutex);
+    const char* sql = "INSERT OR IGNORE INTO notification_subscribers "
+        "(platform, identifier, name, active, tier_premium, tier_opportunity, tier_digest, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?);";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(pimpl_->db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        throw std::runtime_error(std::string("Prepare fail: ") + sqlite3_errmsg(pimpl_->db));
+    }
+    sqlite3_bind_text(stmt, 1, sub.platform.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, sub.identifier.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, sub.name.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt, 4, sub.active ? 1 : 0);
+    sqlite3_bind_int(stmt, 5, sub.tier_premium ? 1 : 0);
+    sqlite3_bind_int(stmt, 6, sub.tier_opportunity ? 1 : 0);
+    sqlite3_bind_int(stmt, 7, sub.tier_digest ? 1 : 0);
+    sqlite3_bind_text(stmt, 8, sub.created_at.c_str(), -1, SQLITE_TRANSIENT);
+
+    int rc = sqlite3_step(stmt);
+    int64_t last_id = 0;
+    if (rc == SQLITE_DONE) {
+        last_id = sqlite3_last_insert_rowid(pimpl_->db);
+    }
+    sqlite3_finalize(stmt);
+    if (rc != SQLITE_DONE) {
+        throw std::runtime_error(std::string("Step fail: ") + sqlite3_errmsg(pimpl_->db));
+    }
+    return last_id;
+}
+
+void SQLiteStore::update_subscriber(const DbNotificationSubscriber& sub) {
+    std::lock_guard<std::mutex> lock(pimpl_->db_mutex);
+    const char* sql = "UPDATE notification_subscribers SET name = ?, active = ?, "
+        "tier_premium = ?, tier_opportunity = ?, tier_digest = ? WHERE id = ?;";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(pimpl_->db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        throw std::runtime_error(std::string("Prepare fail: ") + sqlite3_errmsg(pimpl_->db));
+    }
+    sqlite3_bind_text(stmt, 1, sub.name.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt, 2, sub.active ? 1 : 0);
+    sqlite3_bind_int(stmt, 3, sub.tier_premium ? 1 : 0);
+    sqlite3_bind_int(stmt, 4, sub.tier_opportunity ? 1 : 0);
+    sqlite3_bind_int(stmt, 5, sub.tier_digest ? 1 : 0);
+    sqlite3_bind_int64(stmt, 6, sub.id);
+
+    int rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    if (rc != SQLITE_DONE) {
+        throw std::runtime_error(std::string("Step fail: ") + sqlite3_errmsg(pimpl_->db));
+    }
+}
+
+void SQLiteStore::remove_subscriber(int64_t id) {
+    std::lock_guard<std::mutex> lock(pimpl_->db_mutex);
+    const char* sql = "DELETE FROM notification_subscribers WHERE id = ?;";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(pimpl_->db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, id);
+        sqlite3_step(stmt);
+    }
+    sqlite3_finalize(stmt);
+}
+
+std::vector<DbNotificationSubscriber> SQLiteStore::get_subscribers(const std::string& platform) {
+    std::lock_guard<std::mutex> lock(pimpl_->db_mutex);
+    std::vector<DbNotificationSubscriber> list;
+    std::string sql_str = "SELECT id, platform, identifier, name, active, tier_premium, tier_opportunity, tier_digest, created_at "
+                          "FROM notification_subscribers";
+    if (!platform.empty()) {
+        sql_str += " WHERE platform = ?";
+    }
+    sql_str += " ORDER BY created_at ASC;";
+
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(pimpl_->db, sql_str.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+        if (!platform.empty()) {
+            sqlite3_bind_text(stmt, 1, platform.c_str(), -1, SQLITE_TRANSIENT);
+        }
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            DbNotificationSubscriber sub;
+            sub.id = sqlite3_column_int64(stmt, 0);
+            sub.platform = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+            sub.identifier = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
+            const char* nm = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+            sub.name = nm ? nm : "";
+            sub.active = sqlite3_column_int(stmt, 4) != 0;
+            sub.tier_premium = sqlite3_column_int(stmt, 5) != 0;
+            sub.tier_opportunity = sqlite3_column_int(stmt, 6) != 0;
+            sub.tier_digest = sqlite3_column_int(stmt, 7) != 0;
+            const char* ca = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 8));
+            sub.created_at = ca ? ca : "";
+            list.push_back(sub);
+        }
+    }
+    sqlite3_finalize(stmt);
+    return list;
+}
+
+std::vector<DbNotificationSubscriber> SQLiteStore::get_active_subscribers_for_tier(
+    const std::string& platform, const std::string& tier) {
+    std::lock_guard<std::mutex> lock(pimpl_->db_mutex);
+    std::vector<DbNotificationSubscriber> list;
+
+    // Map tier name to column name
+    std::string tier_col;
+    if (tier == "premium") tier_col = "tier_premium";
+    else if (tier == "opportunity") tier_col = "tier_opportunity";
+    else if (tier == "interesting" || tier == "digest") tier_col = "tier_digest";
+    else return list; // Unknown tier
+
+    std::string sql_str = "SELECT id, platform, identifier, name, active, tier_premium, tier_opportunity, tier_digest, created_at "
+                          "FROM notification_subscribers WHERE platform = ? AND active = 1 AND " + tier_col + " = 1 "
+                          "ORDER BY created_at ASC;";
+
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(pimpl_->db, sql_str.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, platform.c_str(), -1, SQLITE_TRANSIENT);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            DbNotificationSubscriber sub;
+            sub.id = sqlite3_column_int64(stmt, 0);
+            sub.platform = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+            sub.identifier = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
+            const char* nm = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+            sub.name = nm ? nm : "";
+            sub.active = sqlite3_column_int(stmt, 4) != 0;
+            sub.tier_premium = sqlite3_column_int(stmt, 5) != 0;
+            sub.tier_opportunity = sqlite3_column_int(stmt, 6) != 0;
+            sub.tier_digest = sqlite3_column_int(stmt, 7) != 0;
+            const char* ca = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 8));
+            sub.created_at = ca ? ca : "";
+            list.push_back(sub);
         }
     }
     sqlite3_finalize(stmt);

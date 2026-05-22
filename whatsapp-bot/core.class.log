@@ -1,0 +1,28 @@
+[handleMsg]:  {
+  key: {
+    remoteJid: '114198986113224@lid',
+    remoteJidAlt: '41793476034@s.whatsapp.net',
+    fromMe: false,
+    id: '3A773F18B8A5CAD16B78',
+    participant: '',
+    participantAlt: undefined,
+    addressingMode: 'lid'
+  },
+  category: undefined,
+  messageTimestamp: 1779431489,
+  pushName: 'Susana Borges',
+  broadcast: false,
+  message: Message {
+    conversation: 'Okay. Tel tu quando poderes',
+    messageContextInfo: MessageContextInfo {
+      threadId: [],
+      deviceListMetadata: [DeviceListMetadata],
+      deviceListMetadataVersion: 2,
+      messageSecret: [Uint8Array]
+    }
+  },
+  body: 'Okay. Tel tu quando poderes',
+  name: 'Susana Borges',
+  from: '41793476034',
+  host: '41786139081'
+}

@@ -12,26 +12,27 @@
 [SaxoBrokerAdapter] Reloaded tokens from DB.
 [Engine] Saxo Bank API successfully authenticated.
 [RegimeClassifier] Loaded current regime from DB: chop
+[TelegramBot] Bot token updated: 8859...3m24
 [TelegramBot] Loaded chat configurations:
-  Premium Chat ID:     12345
-  Opportunity Chat ID: 12346
-  Digest Chat ID:      12347
+  Premium Chat ID:     5077709990
+  Opportunity Chat ID: [EMPTY]
+  Digest Chat ID:      [EMPTY]
 [AlertDispatcher] Loaded 3 cluster definitions from YAML.
 [ScreenG] Config loaded: correlation_period=30, zscore_period=90, zscore_threshold=2, loaded pairs=3
 [ScreenC] Config loaded: vol_drop_threshold=3, wick_ratio=0.6, volume_mult=2, panic_drawdown_percentile=0.05
 [HttpServer] Starting Crow Web Server on port 8080...
 [TelegramBot] Polling thread spawned.
 [AlertDispatcher] Started digest monitor thread.
-[AlertDispatcher] Started processing worker thread.
 [AlertDispatcher] Alert Dispatcher threads started.
+[AlertDispatcher] Started processing worker thread.
 [TelegramBot] Loaded chat configurations:
-  Premium Chat ID:     12345
-  Opportunity Chat ID: 12346
-  Digest Chat ID:      12347
+  Premium Chat ID:     5077709990
+  Opportunity Chat ID: [EMPTY]
+  Digest Chat ID:      [EMPTY]
 [PositionManager] Background thread started.
 [Engine] Checking/Seeding daily bars for Screen E (BST/BST.NAV) and Screen F (NVDA)...
-(2026-05-22 00:48:33) [INFO    ] Crow/master server is running at http://0.0.0.0:8080 using 10 threads
-(2026-05-22 00:48:33) [INFO    ] Call `app.loglevel(crow::LogLevel::Warning)` to hide Info level logs.
+(2026-05-22 01:19:53) [INFO    ] Crow/master server is running at http://0.0.0.0:8080 using 10 threads
+(2026-05-22 01:19:53) [INFO    ] Call `app.loglevel(crow::LogLevel::Warning)` to hide Info level logs.
 [Engine] Seeding/Calculating initial EOD regime and Screen D rotation board...
 [RegimeClassifier] Warning: Not enough SPY daily bars (need 219, got 1) for MA calculation. Falling back to default trend score.
 [RegimeClassifier] Evaluated date 2026-05-22: chop (vix=14.5, oas=3.25, breadth=0.76, spx_vs_200ma=0)
@@ -139,495 +140,303 @@
 [TimeSeriesStore] Pre-populated AMD for all resolutions (M1-W1) at base price $155.289
 [ScreenC] Added BTCUSD to watch list for 72 hours.
 [Engine] Connecting quote subscriptions to core screener feed...
-[Engine] Running in headless mode. Press Ctrl+C to terminate.
-(2026-05-22 00:48:35) [INFO    ] Request: 127.0.0.1:56449 0x8f68c3c18 HTTP/1.1 GET /api/regime
-(2026-05-22 00:48:35) [INFO    ] Response: 0x8f68c3c18 /api/regime 200 0
-(2026-05-22 00:48:35) [INFO    ] Request: 127.0.0.1:56450 0x8f65aa018 HTTP/1.1 GET /api/alerts
-(2026-05-22 00:48:35) [INFO    ] Request: 127.0.0.1:56449 0x8f68c3c18 HTTP/1.1 GET /api/positions
-(2026-05-22 00:48:35) [INFO    ] Request: 127.0.0.1:56451 0x8f65ab418 HTTP/1.1 GET /api/candidates
-(2026-05-22 00:48:35) [INFO    ] Request: 127.0.0.1:56452 0x8f65ac818 HTTP/1.1 GET /api/instruments
-(2026-05-22 00:48:35) [INFO    ] Request: 127.0.0.1:56453 0x8f65adc18 HTTP/1.1 GET /api/sector_rotation
-(2026-05-22 00:48:35) [INFO    ] Response: 0x8f65ac818 /api/instruments 200 0
-(2026-05-22 00:48:35) [INFO    ] Request: 127.0.0.1:56454 0x8f65af018 HTTP/1.1 GET /api/settings
-(2026-05-22 00:48:35) [INFO    ] Response: 0x8f65af018 /api/settings 200 0
-(2026-05-22 00:48:35) [INFO    ] Response: 0x8f65adc18 /api/sector_rotation 200 0
-(2026-05-22 00:48:35) [INFO    ] Response: 0x8f68c3c18 /api/positions 200 0
-(2026-05-22 00:48:35) [INFO    ] Request: 127.0.0.1:56452 0x8f65ac818 HTTP/1.1 GET /api/settings/saxo_token
-(2026-05-22 00:48:35) [INFO    ] Response: 0x8f65ab418 /api/candidates 200 0
-(2026-05-22 00:48:35) [INFO    ] Response: 0x8f65ac818 /api/settings/saxo_token 200 0
-(2026-05-22 00:48:35) [INFO    ] Response: 0x8f65aa018 /api/alerts 200 0
-[Telegram] API request 'sendMessage' failed.
-Status: 400, Body: {"ok":false,"error_code":400,"description":"Bad Request: chat not found"}
+[Engine] Opening native GUI window...
+(2026-05-22 01:19:54) [INFO    ] Request: 127.0.0.1:60133 0x101e7de18 HTTP/1.1 GET /
+(2026-05-22 01:19:54) [INFO    ] Response: 0x101e7de18 / 200 0
+(2026-05-22 01:19:54) [INFO    ] Request: 127.0.0.1:60133 0x101e7de18 HTTP/1.1 GET /assets/index-CPUAbTIO.js
+(2026-05-22 01:19:54) [INFO    ] Request: 127.0.0.1:60134 0xc24c91418 HTTP/1.1 GET /assets/index-ZX0RMWIy.css
+(2026-05-22 01:19:54) [INFO    ] Response: 0x101e7de18 /assets/index-CPUAbTIO.js 200 0
+(2026-05-22 01:19:54) [INFO    ] Response: 0xc24c91418 /assets/index-ZX0RMWIy.css 200 0
+(2026-05-22 01:19:54) [INFO    ] Request: 127.0.0.1:60133 0x101e7de18 HTTP/1.1 GET /api/regime
+(2026-05-22 01:19:54) [INFO    ] Response: 0x101e7de18 /api/regime 200 0
+(2026-05-22 01:19:54) [INFO    ] Request: 127.0.0.1:60134 0xc24c91418 HTTP/1.1 GET /api/alerts
+(2026-05-22 01:19:54) [INFO    ] Response: 0xc24c91418 /api/alerts 200 0
+(2026-05-22 01:19:54) [INFO    ] Request: 127.0.0.1:60136 0xc24c92818 HTTP/1.1 GET /api/candidates
+(2026-05-22 01:19:54) [INFO    ] Request: 127.0.0.1:60137 0xc24c93c18 HTTP/1.1 GET /api/instruments
+(2026-05-22 01:19:54) [INFO    ] Request: 127.0.0.1:60138 0xc24c95018 HTTP/1.1 GET /api/sector_rotation
+(2026-05-22 01:19:54) [INFO    ] Response: 0xc24c92818 /api/candidates 200 0
+(2026-05-22 01:19:54) [INFO    ] Response: 0xc24c93c18 /api/instruments 200 0
+(2026-05-22 01:19:54) [INFO    ] Request: 127.0.0.1:60139 0xc24c96418 HTTP/1.1 GET /api/settings
+(2026-05-22 01:19:54) [INFO    ] Response: 0xc24c96418 /api/settings 200 0
+(2026-05-22 01:19:54) [INFO    ] Response: 0xc24c95018 /api/sector_rotation 200 0
+(2026-05-22 01:19:54) [INFO    ] Request: 127.0.0.1:60134 0xc24c91418 HTTP/1.1 GET /api/positions
+(2026-05-22 01:19:54) [INFO    ] Request: 127.0.0.1:60133 0x101e7de18 HTTP/1.1 GET /api/settings/saxo_token
+(2026-05-22 01:19:54) [INFO    ] Response: 0xc24c91418 /api/positions 200 0
 [HttpServer] WS client connected. Active connections: 1
-(2026-05-22 00:48:40) [INFO    ] Request: 127.0.0.1:56454 0x8f65af018 HTTP/1.1 GET /api/regime
-(2026-05-22 00:48:40) [INFO    ] Response: 0x8f65af018 /api/regime 200 0
-(2026-05-22 00:48:40) [INFO    ] Request: 127.0.0.1:56453 0x8f65adc18 HTTP/1.1 GET /api/alerts
-(2026-05-22 00:48:40) [INFO    ] Request: 127.0.0.1:56449 0x8f68c3c18 HTTP/1.1 GET /api/candidates
-(2026-05-22 00:48:40) [INFO    ] Request: 127.0.0.1:56451 0x8f65ab418 HTTP/1.1 GET /api/instruments
-(2026-05-22 00:48:40) [INFO    ] Response: 0x8f68c3c18 /api/candidates 200 0
-(2026-05-22 00:48:40) [INFO    ] Response: 0x8f65ab418 /api/instruments 200 0
-(2026-05-22 00:48:40) [INFO    ] Request: 127.0.0.1:56452 0x8f65ac818 HTTP/1.1 GET /api/sector_rotation
-(2026-05-22 00:48:40) [INFO    ] Response: 0x8f65ac818 /api/sector_rotation 200 0
-(2026-05-22 00:48:40) [INFO    ] Request: 127.0.0.1:56450 0x8f65aa018 HTTP/1.1 GET /api/settings
-(2026-05-22 00:48:40) [INFO    ] Response: 0x8f65aa018 /api/settings 200 0
-(2026-05-22 00:48:40) [INFO    ] Response: 0x8f65adc18 /api/alerts 200 0
-(2026-05-22 00:48:40) [INFO    ] Request: 127.0.0.1:56454 0x8f65af018 HTTP/1.1 GET /api/positions
-(2026-05-22 00:48:40) [INFO    ] Request: 127.0.0.1:56449 0x8f68c3c18 HTTP/1.1 GET /api/settings/saxo_token
-(2026-05-22 00:48:40) [INFO    ] Response: 0x8f65af018 /api/positions 200 0
-(2026-05-22 00:48:40) [INFO    ] Response: 0x8f68c3c18 /api/settings/saxo_token 200 0
-(2026-05-22 00:48:45) [INFO    ] Request: 127.0.0.1:56451 0x8f65ab418 HTTP/1.1 GET /api/regime
-(2026-05-22 00:48:45) [INFO    ] Response: 0x8f65ab418 /api/regime 200 0
-(2026-05-22 00:48:45) [INFO    ] Request: 127.0.0.1:56452 0x8f65ac818 HTTP/1.1 GET /api/alerts
-(2026-05-22 00:48:45) [INFO    ] Request: 127.0.0.1:56450 0x8f65aa018 HTTP/1.1 GET /api/candidates
-(2026-05-22 00:48:45) [INFO    ] Request: 127.0.0.1:56453 0x8f65adc18 HTTP/1.1 GET /api/instruments
-(2026-05-22 00:48:45) [INFO    ] Response: 0x8f65aa018 /api/candidates 200 0
-(2026-05-22 00:48:45) [INFO    ] Response: 0x8f65adc18 /api/instruments 200 0
-(2026-05-22 00:48:45) [INFO    ] Request: 127.0.0.1:56454 0x8f65af018 HTTP/1.1 GET /api/sector_rotation
-(2026-05-22 00:48:45) [INFO    ] Response: 0x8f65af018 /api/sector_rotation 200 0
-(2026-05-22 00:48:45) [INFO    ] Request: 127.0.0.1:56449 0x8f68c3c18 HTTP/1.1 GET /api/settings
-(2026-05-22 00:48:45) [INFO    ] Response: 0x8f68c3c18 /api/settings 200 0
-(2026-05-22 00:48:45) [INFO    ] Request: 127.0.0.1:56451 0x8f65ab418 HTTP/1.1 GET /api/positions
-(2026-05-22 00:48:45) [INFO    ] Response: 0x8f65ac818 /api/alerts 200 0
-(2026-05-22 00:48:45) [INFO    ] Request: 127.0.0.1:56450 0x8f65aa018 HTTP/1.1 GET /api/settings/saxo_token
-(2026-05-22 00:48:45) [INFO    ] Response: 0x8f65ab418 /api/positions 200 0
-(2026-05-22 00:48:45) [INFO    ] Response: 0x8f65aa018 /api/settings/saxo_token 200 0
+(2026-05-22 01:19:54) [INFO    ] Response: 0x101e7de18 /api/settings/saxo_token 200 0
+[HttpServer] WS client connected. Active connections: 2
+(2026-05-22 01:19:55) [INFO    ] Request: 127.0.0.1:60150 0xc24c97818 HTTP/1.1 GET /api/whatsapp_status
+(2026-05-22 01:19:55) [INFO    ] Response: 0xc24c97818 /api/whatsapp_status 200 0
+(2026-05-22 01:19:56) [INFO    ] Request: 127.0.0.1:60136 0xc24c92818 HTTP/1.1 GET /api/whatsapp_status
+(2026-05-22 01:19:56) [INFO    ] Response: 0xc24c92818 /api/whatsapp_status 200 0
+(2026-05-22 01:19:56) [INFO    ] Request: 127.0.0.1:60162 0xc24c98c18 HTTP/1.1 GET /api/settings
+(2026-05-22 01:19:56) [INFO    ] Response: 0xc24c98c18 /api/settings 200 0
+(2026-05-22 01:19:56) [INFO    ] Request: 127.0.0.1:60163 0xc24c97818 HTTP/1.1 GET /api/settings
+(2026-05-22 01:19:56) [INFO    ] Request: 127.0.0.1:60164 0xc24c9a018 HTTP/1.1 GET /api/settings
+(2026-05-22 01:19:56) [INFO    ] Response: 0xc24c97818 /api/settings 200 0
+(2026-05-22 01:19:56) [INFO    ] Response: 0xc24c9a018 /api/settings 200 0
+(2026-05-22 01:19:56) [INFO    ] Request: 127.0.0.1:60165 0xc24c9b418 HTTP/1.1 GET /api/settings
+(2026-05-22 01:19:56) [INFO    ] Request: 127.0.0.1:60166 0xc24c9c818 HTTP/1.1 GET /api/settings
+(2026-05-22 01:19:56) [INFO    ] Response: 0xc24c9b418 /api/settings 200 0
+(2026-05-22 01:19:56) [INFO    ] Response: 0xc24c9c818 /api/settings 200 0
+(2026-05-22 01:19:56) [INFO    ] Request: 127.0.0.1:60162 0xc24c98c18 HTTP/1.1 GET /api/settings
+(2026-05-22 01:19:56) [INFO    ] Response: 0xc24c98c18 /api/settings 200 0
+(2026-05-22 01:19:56) [INFO    ] Request: 127.0.0.1:60163 0xc24c97818 HTTP/1.1 GET /api/settings
+(2026-05-22 01:19:56) [INFO    ] Response: 0xc24c97818 /api/settings 200 0
+(2026-05-22 01:19:56) [INFO    ] Request: 127.0.0.1:60164 0xc24c9a018 HTTP/1.1 GET /api/settings
+(2026-05-22 01:19:56) [INFO    ] Response: 0xc24c9a018 /api/settings 200 0
+(2026-05-22 01:19:59) [INFO    ] Request: 127.0.0.1:60137 0xc24c93c18 HTTP/1.1 GET /api/whatsapp_status
+(2026-05-22 01:19:59) [INFO    ] Response: 0xc24c93c18 /api/whatsapp_status 200 0
+(2026-05-22 01:19:59) [INFO    ] Request: 127.0.0.1:60139 0xc24c96418 HTTP/1.1 GET /api/regime
+(2026-05-22 01:19:59) [INFO    ] Response: 0xc24c96418 /api/regime 200 0
+(2026-05-22 01:19:59) [INFO    ] Request: 127.0.0.1:60134 0xc24c91418 HTTP/1.1 GET /api/alerts
+(2026-05-22 01:19:59) [INFO    ] Request: 127.0.0.1:60138 0xc24c95018 HTTP/1.1 GET /api/candidates
+(2026-05-22 01:19:59) [INFO    ] Request: 127.0.0.1:60133 0x101e7de18 HTTP/1.1 GET /api/instruments
+(2026-05-22 01:19:59) [INFO    ] Response: 0xc24c95018 /api/candidates 200 0
+(2026-05-22 01:19:59) [INFO    ] Response: 0x101e7de18 /api/instruments 200 0
+(2026-05-22 01:19:59) [INFO    ] Request: 127.0.0.1:60136 0xc24c92818 HTTP/1.1 GET /api/sector_rotation
+(2026-05-22 01:19:59) [INFO    ] Response: 0xc24c92818 /api/sector_rotation 200 0
+(2026-05-22 01:19:59) [INFO    ] Request: 127.0.0.1:60137 0xc24c93c18 HTTP/1.1 GET /api/settings
+(2026-05-22 01:19:59) [INFO    ] Response: 0xc24c93c18 /api/settings 200 0
+(2026-05-22 01:19:59) [INFO    ] Request: 127.0.0.1:60139 0xc24c96418 HTTP/1.1 GET /api/positions
+(2026-05-22 01:19:59) [INFO    ] Response: 0xc24c91418 /api/alerts 200 0
+(2026-05-22 01:19:59) [INFO    ] Request: 127.0.0.1:60138 0xc24c95018 HTTP/1.1 GET /api/settings/saxo_token
+(2026-05-22 01:19:59) [INFO    ] Response: 0xc24c96418 /api/positions 200 0
+(2026-05-22 01:19:59) [INFO    ] Response: 0xc24c95018 /api/settings/saxo_token 200 0
+(2026-05-22 01:20:02) [INFO    ] Request: 127.0.0.1:60133 0x101e7de18 HTTP/1.1 GET /api/whatsapp_status
+(2026-05-22 01:20:02) [INFO    ] Response: 0x101e7de18 /api/whatsapp_status 200 0
+(2026-05-22 01:20:04) [INFO    ] Request: 127.0.0.1:60136 0xc24c92818 HTTP/1.1 GET /api/regime
+(2026-05-22 01:20:04) [INFO    ] Response: 0xc24c92818 /api/regime 200 0
+(2026-05-22 01:20:04) [INFO    ] Request: 127.0.0.1:60137 0xc24c93c18 HTTP/1.1 GET /api/alerts
+(2026-05-22 01:20:04) [INFO    ] Request: 127.0.0.1:60134 0xc24c91418 HTTP/1.1 GET /api/candidates
+(2026-05-22 01:20:04) [INFO    ] Request: 127.0.0.1:60139 0xc24c96418 HTTP/1.1 GET /api/instruments
+(2026-05-22 01:20:04) [INFO    ] Response: 0xc24c91418 /api/candidates 200 0
+(2026-05-22 01:20:04) [INFO    ] Response: 0xc24c96418 /api/instruments 200 0
+(2026-05-22 01:20:04) [INFO    ] Request: 127.0.0.1:60138 0xc24c95018 HTTP/1.1 GET /api/sector_rotation
+(2026-05-22 01:20:04) [INFO    ] Request: 127.0.0.1:60133 0x101e7de18 HTTP/1.1 GET /api/settings
+(2026-05-22 01:20:04) [INFO    ] Response: 0x101e7de18 /api/settings 200 0
+(2026-05-22 01:20:04) [INFO    ] Response: 0xc24c95018 /api/sector_rotation 200 0
+(2026-05-22 01:20:04) [INFO    ] Request: 127.0.0.1:60136 0xc24c92818 HTTP/1.1 GET /api/positions
+(2026-05-22 01:20:04) [INFO    ] Request: 127.0.0.1:60134 0xc24c91418 HTTP/1.1 GET /api/settings/saxo_token
+(2026-05-22 01:20:04) [INFO    ] Response: 0xc24c93c18 /api/alerts 200 0
+(2026-05-22 01:20:04) [INFO    ] Response: 0xc24c92818 /api/positions 200 0
+(2026-05-22 01:20:04) [INFO    ] Response: 0xc24c91418 /api/settings/saxo_token 200 0
+(2026-05-22 01:20:05) [INFO    ] Request: 127.0.0.1:60139 0xc24c96418 HTTP/1.1 GET /api/whatsapp_status
+(2026-05-22 01:20:05) [INFO    ] Response: 0xc24c96418 /api/whatsapp_status 200 0
+(2026-05-22 01:20:08) [INFO    ] Request: 127.0.0.1:60133 0x101e7de18 HTTP/1.1 GET /api/whatsapp_status
+(2026-05-22 01:20:08) [INFO    ] Response: 0x101e7de18 /api/whatsapp_status 200 0
 [RegimeClassifier] Warning: Not enough SPY daily bars (need 219, got 1) for MA calculation. Falling back to default trend score.
-[RegimeClassifier] Evaluated date 2026-05-22: chop (vix=14.4817, oas=3.2677, breadth=0.767165, spx_vs_200ma=0)
+[RegimeClassifier] Evaluated date 2026-05-22: chop (vix=14.4647, oas=3.20146, breadth=0.730995, spx_vs_200ma=0)
 [ScreenD] Running Industry Rotation calculations for date: 2026-05-22
 [ScreenD] Industry Rotation calculations complete. Evaluated 70 instruments.
 [ScreenB] Running Swing Pullback calculations for date: 2026-05-22
 [ScreenB] Swing Pullback calculations complete. Registered 2 candidates.
 [ScreenA] Pre-market evaluation complete for 2026-05-22. Registered candidate TSLA with -6.5% gap down.
+[ScreenA] TRIGGERED: TSLA on tier interesting. Screen A triggered. Price: $140.00 (VWAP - 4.47σ), 5m Vol Ratio: 0.04x, Sector Change: 0.05%, 1m RS: -56.52%
 [ScreenE] Running CEF Discount calculations for date: 2026-05-22
 [ScreenF] Running Darvas Box Breakout calculations for date: 2026-05-22
 [ScreenG] Cross-Asset Divergence evaluation complete. Results: 3
 [ScreenC] Capitulation Wick Reversal evaluation complete. Results: 1
-(2026-05-22 00:48:50) [INFO    ] Request: 127.0.0.1:56453 0x8f65adc18 HTTP/1.1 GET /api/regime
-(2026-05-22 00:48:50) [INFO    ] Response: 0x8f65adc18 /api/regime 200 0
-(2026-05-22 00:48:50) [INFO    ] Request: 127.0.0.1:56454 0x8f65af018 HTTP/1.1 GET /api/alerts
-(2026-05-22 00:48:50) [INFO    ] Request: 127.0.0.1:56449 0x8f68c3c18 HTTP/1.1 GET /api/candidates
-(2026-05-22 00:48:50) [INFO    ] Request: 127.0.0.1:56452 0x8f65ac818 HTTP/1.1 GET /api/instruments
-(2026-05-22 00:48:50) [INFO    ] Request: 127.0.0.1:56451 0x8f65ab418 HTTP/1.1 GET /api/sector_rotation
-(2026-05-22 00:48:50) [INFO    ] Response: 0x8f65ab418 /api/sector_rotation 200 0
-(2026-05-22 00:48:50) [INFO    ] Request: 127.0.0.1:56450 0x8f65aa018 HTTP/1.1 GET /api/settings
-(2026-05-22 00:48:50) [INFO    ] Response: 0x8f65ac818 /api/instruments 200 0
-(2026-05-22 00:48:50) [INFO    ] Response: 0x8f65aa018 /api/settings 200 0
-(2026-05-22 00:48:50) [INFO    ] Response: 0x8f68c3c18 /api/candidates 200 0
-(2026-05-22 00:48:50) [INFO    ] Request: 127.0.0.1:56453 0x8f65adc18 HTTP/1.1 GET /api/positions
-(2026-05-22 00:48:50) [INFO    ] Request: 127.0.0.1:56451 0x8f65ab418 HTTP/1.1 GET /api/settings/saxo_token
-(2026-05-22 00:48:50) [INFO    ] Response: 0x8f65adc18 /api/positions 200 0
-(2026-05-22 00:48:50) [INFO    ] Response: 0x8f65ab418 /api/settings/saxo_token 200 0
-(2026-05-22 00:48:50) [INFO    ] Response: 0x8f65af018 /api/alerts 200 0
-(2026-05-22 00:48:57) [INFO    ] Request: 127.0.0.1:56508 0x8f65b1818 HTTP/1.1 GET /api/regime(2026-05-22 00:48:57) [INFO    ] Request: 127.0.0.1:56509 0x8f65aa018 HTTP/1.1 GET /api/alerts
-(2026-05-22 00:48:57) [INFO    ] Request: 127.0.0.1:56510 0x8f65ac818 HTTP/1.1 GET /api/candidates
+(2026-05-22 01:20:09) [INFO    ] Request: 127.0.0.1:60138 0xc24c95018 HTTP/1.1 GET /api/regime
+(2026-05-22 01:20:09) [INFO    ] Response: 0xc24c95018 /api/regime 200 0
+(2026-05-22 01:20:09) [INFO    ] Request: 127.0.0.1:60137 0xc24c93c18 HTTP/1.1 GET /api/alerts
+(2026-05-22 01:20:09) [INFO    ] Request: 127.0.0.1:60136 0xc24c92818 HTTP/1.1 GET /api/candidates
+(2026-05-22 01:20:09) [INFO    ] Request: 127.0.0.1:60134 0xc24c91418 HTTP/1.1 GET /api/instruments
+(2026-05-22 01:20:09) [INFO    ] Response: 0xc24c92818 /api/candidates 200 0
+(2026-05-22 01:20:09) [INFO    ] Response: 0xc24c91418 /api/instruments 200 0
+(2026-05-22 01:20:09) [INFO    ] Request: 127.0.0.1:60139 0xc24c96418 HTTP/1.1 GET /api/sector_rotation
+(2026-05-22 01:20:09) [INFO    ] Request: 127.0.0.1:60133 0x101e7de18 HTTP/1.1 GET /api/settings
+(2026-05-22 01:20:09) [INFO    ] Response: 0xc24c96418 /api/sector_rotation 200 0
+(2026-05-22 01:20:09) [INFO    ] Response: 0x101e7de18 /api/settings 200 0
+(2026-05-22 01:20:09) [INFO    ] Request: 127.0.0.1:60138 0xc24c95018 HTTP/1.1 GET /api/positions
+(2026-05-22 01:20:09) [INFO    ] Request: 127.0.0.1:60136 0xc24c92818 HTTP/1.1 GET /api/settings/saxo_token
+(2026-05-22 01:20:09) [INFO    ] Response: 0xc24c95018 /api/positions 200 0
+(2026-05-22 01:20:09) [INFO    ] Response: 0xc24c93c18 /api/alerts 200 0
+(2026-05-22 01:20:09) [INFO    ] Response: 0xc24c92818 /api/settings/saxo_token 200 0
+(2026-05-22 01:20:09) [INFO    ] Request: 127.0.0.1:60173 0xc24c9dc18 HTTP/1.1 GET /api/settings
+(2026-05-22 01:20:09) [INFO    ] Response: 0xc24c9dc18 /api/settings 200 0
+(2026-05-22 01:20:11) [INFO    ] Request: 127.0.0.1:60134 0xc24c91418 HTTP/1.1 GET /api/whatsapp_status
+(2026-05-22 01:20:11) [INFO    ] Response: 0xc24c91418 /api/whatsapp_status 200 0
+(2026-05-22 01:20:14) [INFO    ] Request: 127.0.0.1:60139 0xc24c96418 HTTP/1.1 GET /api/whatsapp_status
+(2026-05-22 01:20:14) [INFO    ] Response: 0xc24c96418 /api/whatsapp_status 200 0
+(2026-05-22 01:20:14) [INFO    ] Request: 127.0.0.1:60133 0x101e7de18 HTTP/1.1 GET /api/regime
+(2026-05-22 01:20:14) [INFO    ] Response: 0x101e7de18 /api/regime 200 0
+(2026-05-22 01:20:14) [INFO    ] Request: 127.0.0.1:60138 0xc24c95018 HTTP/1.1 GET /api/alerts
+(2026-05-22 01:20:14) [INFO    ] Request: 127.0.0.1:60137 0xc24c93c18 HTTP/1.1 GET /api/candidates
+(2026-05-22 01:20:14) [INFO    ] Request: 127.0.0.1:60136 0xc24c92818 HTTP/1.1 GET /api/instruments
+(2026-05-22 01:20:14) [INFO    ] Response: 0xc24c93c18 /api/candidates 200 0
+(2026-05-22 01:20:14) [INFO    ] Response: 0xc24c92818 /api/instruments 200 0
+(2026-05-22 01:20:14) [INFO    ] Request: 127.0.0.1:60134 0xc24c91418 HTTP/1.1 GET /api/sector_rotation
+(2026-05-22 01:20:14) [INFO    ] Request: 127.0.0.1:60139 0xc24c96418 HTTP/1.1 GET /api/settings
+(2026-05-22 01:20:14) [INFO    ] Response: 0xc24c91418 /api/sector_rotation 200 0
+(2026-05-22 01:20:14) [INFO    ] Response: 0xc24c96418 /api/settings 200 0
+(2026-05-22 01:20:14) [INFO    ] Request: 127.0.0.1:60133 0x101e7de18 HTTP/1.1 GET /api/positions
+(2026-05-22 01:20:14) [INFO    ] Response: 0xc24c95018 /api/alerts 200 0
+(2026-05-22 01:20:14) [INFO    ] Request: 127.0.0.1:60137 0xc24c93c18 HTTP/1.1 GET /api/settings/saxo_token
+(2026-05-22 01:20:14) [INFO    ] Response: 0x101e7de18 /api/positions 200 0
+(2026-05-22 01:20:14) [INFO    ] Response: 0xc24c93c18 /api/settings/saxo_token 200 0
+(2026-05-22 01:20:17) [INFO    ] Request: 127.0.0.1:60136 0xc24c92818 HTTP/1.1 GET /api/whatsapp_status
+(2026-05-22 01:20:17) [INFO    ] Response: 0xc24c92818 /api/whatsapp_status 200 0
+(2026-05-22 01:20:19) [INFO    ] Request: 127.0.0.1:60134 0xc24c91418 HTTP/1.1 GET /api/regime
+(2026-05-22 01:20:19) [INFO    ] Response: 0xc24c91418 /api/regime 200 0
+(2026-05-22 01:20:19) [INFO    ] Request: 127.0.0.1:60139 0xc24c96418 HTTP/1.1 GET /api/alerts
+(2026-05-22 01:20:19) [INFO    ] Request: 127.0.0.1:60138 0xc24c95018 HTTP/1.1 GET /api/candidates
+(2026-05-22 01:20:19) [INFO    ] Request: 127.0.0.1:60133 0x101e7de18 HTTP/1.1 GET /api/instruments
+(2026-05-22 01:20:19) [INFO    ] Response: 0xc24c95018 /api/candidates 200 0
+(2026-05-22 01:20:19) [INFO    ] Response: 0x101e7de18 /api/instruments 200 0
+(2026-05-22 01:20:19) [INFO    ] Request: 127.0.0.1:60137 0xc24c93c18 HTTP/1.1 GET /api/sector_rotation
+(2026-05-22 01:20:19) [INFO    ] Request: 127.0.0.1:60136 0xc24c92818 HTTP/1.1 GET /api/settings(2026-05-22 01:20:19) [INFO    ] Response: 0xc24c93c18 /api/sector_rotation 200 0
 
-(2026-05-22 00:48:57) [INFO    ] Request: 127.0.0.1:56511 0x8f65adc18 HTTP/1.1 GET /api/instruments
-(2026-05-22 00:48:57) [INFO    ] Request: 127.0.0.1:56512 0x8f65af018 HTTP/1.1 GET /api/sector_rotation
-(2026-05-22 00:48:57) [INFO    ] Request: 127.0.0.1:56513 0x8f65ab418 HTTP/1.1 GET /api/settings
-(2026-05-22 00:48:57) [INFO    ] Response: 0x8f65ab418 /api/settings 200 0
-(2026-05-22 00:48:57) [INFO    ] Response: 0x8f65b1818 /api/regime 200 0
-(2026-05-22 00:48:57) [INFO    ] Response: 0x8f65af018 /api/sector_rotation 200 0
-(2026-05-22 00:48:57) [INFO    ] Response: 0x8f65adc18 /api/instruments 200 0
-(2026-05-22 00:48:57) [INFO    ] Response: 0x8f65ac818 /api/candidates 200 0
-(2026-05-22 00:48:57) [INFO    ] Request: 127.0.0.1:56513 0x8f65ab418 HTTP/1.1 GET /api/positions
-(2026-05-22 00:48:57) [INFO    ] Request: 127.0.0.1:56508 0x8f65b1818 HTTP/1.1 GET /api/settings/saxo_token
-(2026-05-22 00:48:57) [INFO    ] Response: 0x8f65ab418 /api/positions 200 0
-(2026-05-22 00:48:57) [INFO    ] Response: 0x8f65b1818 /api/settings/saxo_token 200 0
-(2026-05-22 00:48:57) [INFO    ] Response: 0x8f65aa018 /api/alerts 200 0
-[TelegramBot] Received message: "/set-premium" from Chat ID: 5077709990
+(2026-05-22 01:20:19) [INFO    ] Response: 0xc24c92818 /api/settings 200 0
+(2026-05-22 01:20:19) [INFO    ] Request: 127.0.0.1:60134 0xc24c91418 HTTP/1.1 GET /api/positions
+(2026-05-22 01:20:19) [INFO    ] Response: 0xc24c96418 /api/alerts 200 0
+(2026-05-22 01:20:19) [INFO    ] Request: 127.0.0.1:60138 0xc24c95018 HTTP/1.1 GET /api/settings/saxo_token
+(2026-05-22 01:20:19) [INFO    ] Response: 0xc24c91418 /api/positions 200 0
+(2026-05-22 01:20:19) [INFO    ] Response: 0xc24c95018 /api/settings/saxo_token 200 0
+(2026-05-22 01:20:20) [INFO    ] Request: 127.0.0.1:60133 0x101e7de18 HTTP/1.1 GET /api/whatsapp_status
+(2026-05-22 01:20:20) [INFO    ] Response: 0x101e7de18 /api/whatsapp_status 200 0
+(2026-05-22 01:20:23) [INFO    ] Request: 127.0.0.1:60137 0xc24c93c18 HTTP/1.1 GET /api/whatsapp_status
+(2026-05-22 01:20:23) [INFO    ] Response: 0xc24c93c18 /api/whatsapp_status 200 0
+[RegimeClassifier] Warning: Not enough SPY daily bars (need 219, got 1) for MA calculation. Falling back to default trend score.
+[RegimeClassifier] Evaluated date 2026-05-22: chop (vix=14.8885, oas=3.2997, breadth=0.714301, spx_vs_200ma=0)
+[ScreenD] Running Industry Rotation calculations for date: 2026-05-22
+[ScreenD] Industry Rotation calculations complete. Evaluated 70 instruments.
+[ScreenB] Running Swing Pullback calculations for date: 2026-05-22
+[ScreenB] Swing Pullback calculations complete. Registered 2 candidates.
+[ScreenE] Running CEF Discount calculations for date: 2026-05-22
+[ScreenF] Running Darvas Box Breakout calculations for date: 2026-05-22
+[ScreenG] Cross-Asset Divergence evaluation complete. Results: 3
+[ScreenC] Capitulation Wick Reversal evaluation complete. Results: 1
 [TelegramBot] Loaded chat configurations:
-  Premium Chat ID:     12345
-  Opportunity Chat ID: 12346
-  Digest Chat ID:      12347
-(2026-05-22 00:49:02) [INFO    ] Request: 127.0.0.1:56512 0x8f65af018 HTTP/1.1 GET /api/regime
-(2026-05-22 00:49:02) [INFO    ] Response: 0x8f65af018 /api/regime 200 0
-(2026-05-22 00:49:02) [INFO    ] Request: 127.0.0.1:56511 0x8f65adc18 HTTP/1.1 GET /api/alerts
-(2026-05-22 00:49:02) [INFO    ] Request: 127.0.0.1:56510 0x8f65ac818 HTTP/1.1 GET /api/candidates
-(2026-05-22 00:49:02) [INFO    ] Request: 127.0.0.1:56513 0x8f65ab418 HTTP/1.1 GET /api/instruments
-(2026-05-22 00:49:02) [INFO    ] Response: 0x8f65ac818 /api/candidates 200 0
-(2026-05-22 00:49:02) [INFO    ] Response: 0x8f65ab418 /api/instruments 200 0
-(2026-05-22 00:49:02) [INFO    ] Request: 127.0.0.1:56508 0x8f65b1818 HTTP/1.1 GET /api/sector_rotation
-(2026-05-22 00:49:02) [INFO    ] Response: 0x8f65b1818 /api/sector_rotation 200 0
-(2026-05-22 00:49:02) [INFO    ] Request: 127.0.0.1:56509 0x8f65aa018 HTTP/1.1 GET /api/settings
-(2026-05-22 00:49:02) [INFO    ] Response: 0x8f65aa018 /api/settings 200 0
-(2026-05-22 00:49:02) [INFO    ] Response: 0x8f65adc18 /api/alerts 200 0
-(2026-05-22 00:49:02) [INFO    ] Request: 127.0.0.1:56512 0x8f65af018 HTTP/1.1 GET /api/positions
-(2026-05-22 00:49:02) [INFO    ] Request: 127.0.0.1:56510 0x8f65ac818 HTTP/1.1 GET /api/settings/saxo_token
-(2026-05-22 00:49:02) [INFO    ] Response: 0x8f65af018 /api/positions 200 0
-(2026-05-22 00:49:02) [INFO    ] Response: 0x8f65ac818 /api/settings/saxo_token 200 0
-[RegimeClassifier] Warning: Not enough SPY daily bars (need 219, got 1) for MA calculation. Falling back to default trend score.
-[RegimeClassifier] Evaluated date 2026-05-22: chop (vix=14.7572, oas=3.20282, breadth=0.736535, spx_vs_200ma=0)
-[ScreenD] Running Industry Rotation calculations for date: 2026-05-22
-[ScreenD] Industry Rotation calculations complete. Evaluated 70 instruments.
-[ScreenB] Running Swing Pullback calculations for date: 2026-05-22
-[ScreenB] Swing Pullback calculations complete. Registered 2 candidates.
-[ScreenE] Running CEF Discount calculations for date: 2026-05-22
-[ScreenF] Running Darvas Box Breakout calculations for date: 2026-05-22
-[ScreenG] Cross-Asset Divergence evaluation complete. Results: 3
-[ScreenC] Capitulation Wick Reversal evaluation complete. Results: 1
-(2026-05-22 00:49:07) [INFO    ] Request: 127.0.0.1:56513 0x8f65ab418 HTTP/1.1 GET /api/regime
-(2026-05-22 00:49:07) [INFO    ] Request: 127.0.0.1:56508 0x8f65b1818 HTTP/1.1 GET /api/alerts
-(2026-05-22 00:49:07) [INFO    ] Response: 0x8f65ab418 /api/regime 200 0
-(2026-05-22 00:49:07) [INFO    ] Request: 127.0.0.1:56509 0x8f65aa018 HTTP/1.1 GET /api/candidates
-(2026-05-22 00:49:07) [INFO    ] Request: 127.0.0.1:56511 0x8f65adc18 HTTP/1.1 GET /api/instruments
-(2026-05-22 00:49:07) [INFO    ] Response: 0x8f65adc18 /api/instruments 200 0
-(2026-05-22 00:49:07) [INFO    ] Request: 127.0.0.1:56512 0x8f65af018 HTTP/1.1 GET /api/sector_rotation
-(2026-05-22 00:49:07) [INFO    ] Response: 0x8f65aa018 /api/candidates 200 0
-(2026-05-22 00:49:07) [INFO    ] Request: 127.0.0.1:56510 0x8f65ac818 HTTP/1.1 GET /api/settings
-(2026-05-22 00:49:07) [INFO    ] Response: 0x8f65ac818 /api/settings 200 0
-(2026-05-22 00:49:07) [INFO    ] Response: 0x8f65af018 /api/sector_rotation 200 0
-(2026-05-22 00:49:07) [INFO    ] Request: 127.0.0.1:56513 0x8f65ab418 HTTP/1.1 GET /api/positions
-(2026-05-22 00:49:07) [INFO    ] Request: 127.0.0.1:56511 0x8f65adc18 HTTP/1.1 GET /api/settings/saxo_token
-(2026-05-22 00:49:07) [INFO    ] Response: 0x8f65ab418 /api/positions 200 0
-(2026-05-22 00:49:07) [INFO    ] Response: 0x8f65adc18 /api/settings/saxo_token 200 0
-(2026-05-22 00:49:07) [INFO    ] Response: 0x8f65b1818 /api/alerts 200 0
-(2026-05-22 00:49:12) [INFO    ] Request: 127.0.0.1:56509 0x8f65aa018 HTTP/1.1 GET /api/regime
-(2026-05-22 00:49:12) [INFO    ] Response: 0x8f65aa018 /api/regime 200 0
-(2026-05-22 00:49:12) [INFO    ] Request: 127.0.0.1:56510 0x8f65ac818 HTTP/1.1 GET /api/alerts
-(2026-05-22 00:49:12) [INFO    ] Request: 127.0.0.1:56512 0x8f65af018 HTTP/1.1 GET /api/candidates
-(2026-05-22 00:49:12) [INFO    ] Request: 127.0.0.1:56513 0x8f65ab418 HTTP/1.1 GET /api/instruments
-(2026-05-22 00:49:12) [INFO    ] Response: 0x8f65af018 /api/candidates 200 0
-(2026-05-22 00:49:12) [INFO    ] Response: 0x8f65ab418 /api/instruments 200 0
-(2026-05-22 00:49:12) [INFO    ] Request: 127.0.0.1:56511 0x8f65adc18 HTTP/1.1 GET /api/sector_rotation
-(2026-05-22 00:49:12) [INFO    ] Response: 0x8f65adc18 /api/sector_rotation 200 0
-(2026-05-22 00:49:12) [INFO    ] Request: 127.0.0.1:56508 0x8f65b1818 HTTP/1.1 GET /api/settings
-(2026-05-22 00:49:12) [INFO    ] Response: 0x8f65b1818 /api/settings 200 0
-(2026-05-22 00:49:12) [INFO    ] Request: 127.0.0.1:56509 0x8f65aa018 HTTP/1.1 GET /api/positions
-(2026-05-22 00:49:12) [INFO    ] Response: 0x8f65ac818 /api/alerts 200 0
-(2026-05-22 00:49:12) [INFO    ] Request: 127.0.0.1:56512 0x8f65af018 HTTP/1.1 GET /api/settings/saxo_token
-(2026-05-22 00:49:12) [INFO    ] Response: 0x8f65aa018 /api/positions 200 0
-(2026-05-22 00:49:12) [INFO    ] Response: 0x8f65af018 /api/settings/saxo_token 200 0
-(2026-05-22 00:49:17) [INFO    ] Request: 127.0.0.1:56513 0x8f65ab418 HTTP/1.1 GET /api/regime
-(2026-05-22 00:49:17) [INFO    ] Response: 0x8f65ab418 /api/regime 200 0
-(2026-05-22 00:49:17) [INFO    ] Request: 127.0.0.1:56511 0x8f65adc18 HTTP/1.1 GET /api/alerts
-(2026-05-22 00:49:17) [INFO    ] Request: 127.0.0.1:56508 0x8f65b1818 HTTP/1.1 GET /api/candidates
-(2026-05-22 00:49:17) [INFO    ] Request: 127.0.0.1:56510 0x8f65ac818 HTTP/1.1 GET /api/instruments
-(2026-05-22 00:49:17) [INFO    ] Response: 0x8f65b1818 /api/candidates 200 0
-(2026-05-22 00:49:17) [INFO    ] Response: 0x8f65ac818 /api/instruments 200 0
-(2026-05-22 00:49:17) [INFO    ] Request: 127.0.0.1:56509 0x8f65aa018 HTTP/1.1 GET /api/sector_rotation
-(2026-05-22 00:49:17) [INFO    ] Response: 0x8f65aa018 /api/sector_rotation 200 0
-(2026-05-22 00:49:17) [INFO    ] Request: 127.0.0.1:56512 0x8f65af018 HTTP/1.1 GET /api/settings
-(2026-05-22 00:49:17) [INFO    ] Response: 0x8f65af018 /api/settings 200 0
-(2026-05-22 00:49:17) [INFO    ] Request: 127.0.0.1:56513 0x8f65ab418 HTTP/1.1 GET /api/positions
-(2026-05-22 00:49:17) [INFO    ] Response: 0x8f65adc18 /api/alerts 200 0
-(2026-05-22 00:49:17) [INFO    ] Request: 127.0.0.1:56508 0x8f65b1818 HTTP/1.1 GET /api/settings/saxo_token
-(2026-05-22 00:49:17) [INFO    ] Response: 0x8f65ab418 /api/positions 200 0
-(2026-05-22 00:49:17) [INFO    ] Response: 0x8f65b1818 /api/settings/saxo_token 200 0
-[RegimeClassifier] Warning: Not enough SPY daily bars (need 219, got 1) for MA calculation. Falling back to default trend score.
-[RegimeClassifier] Evaluated date 2026-05-22: chop (vix=14.7467, oas=3.1777, breadth=0.738425, spx_vs_200ma=0)
-[ScreenD] Running Industry Rotation calculations for date: 2026-05-22
-[ScreenD] Industry Rotation calculations complete. Evaluated 70 instruments.
-[ScreenB] Running Swing Pullback calculations for date: 2026-05-22
-[ScreenB] Swing Pullback calculations complete. Registered 2 candidates.
-[ScreenE] Running CEF Discount calculations for date: 2026-05-22
-[ScreenF] Running Darvas Box Breakout calculations for date: 2026-05-22
-[ScreenG] Cross-Asset Divergence evaluation complete. Results: 3
-[ScreenC] Capitulation Wick Reversal evaluation complete. Results: 1
-(2026-05-22 00:49:23) [INFO    ] Request: 127.0.0.1:56510 0x8f65ac818 HTTP/1.1 GET /api/regime
-(2026-05-22 00:49:23) [INFO    ] Response: 0x8f65ac818 /api/regime 200 0
-(2026-05-22 00:49:23) [INFO    ] Request: 127.0.0.1:56509 0x8f65aa018 HTTP/1.1 GET /api/alerts
-(2026-05-22 00:49:23) [INFO    ] Request: 127.0.0.1:56512 0x8f65af018 HTTP/1.1 GET /api/candidates
-(2026-05-22 00:49:23) [INFO    ] Response: 0x8f65af018 /api/candidates 200 0
-(2026-05-22 00:49:23) [INFO    ] Request: 127.0.0.1:56511 0x8f65adc18 HTTP/1.1 GET /api/instruments
-(2026-05-22 00:49:23) [INFO    ] Response: 0x8f65adc18 /api/instruments 200 0
-(2026-05-22 00:49:23) [INFO    ] Request: 127.0.0.1:56513 0x8f65ab418 HTTP/1.1 GET /api/sector_rotation
-(2026-05-22 00:49:23) [INFO    ] Request: 127.0.0.1:56508 0x8f65b1818 HTTP/1.1 GET /api/settings
-(2026-05-22 00:49:23) [INFO    ] Response: 0x8f65ab418 /api/sector_rotation 200 0
-(2026-05-22 00:49:23) [INFO    ] Response: 0x8f65b1818 /api/settings 200 0
-(2026-05-22 00:49:23) [INFO    ] Response: 0x8f65aa018 /api/alerts 200 0
-(2026-05-22 00:49:23) [INFO    ] Request: 127.0.0.1:56510 0x8f65ac818 HTTP/1.1 GET /api/positions
-(2026-05-22 00:49:23) [INFO    ] Response: 0x8f65ac818 /api/positions 200 0
-(2026-05-22 00:49:23) [INFO    ] Request: 127.0.0.1:56512 0x8f65af018 HTTP/1.1 GET /api/settings/saxo_token
-(2026-05-22 00:49:23) [INFO    ] Response: 0x8f65af018 /api/settings/saxo_token 200 0
-[TelegramBot] Received message: "/status" from Chat ID: 5077709990
-[TelegramBot] Loaded chat configurations:
-  Premium Chat ID:     12345
-  Opportunity Chat ID: 12346
-  Digest Chat ID:      12347
-(2026-05-22 00:49:28) [INFO    ] Request: 127.0.0.1:56561 0x8f65b0418 HTTP/1.1 GET /api/regime
-(2026-05-22 00:49:28) [INFO    ] Response: 0x8f65b0418 /api/regime 200 0
-(2026-05-22 00:49:28) [INFO    ] Request: 127.0.0.1:56562 0x8f65adc18 HTTP/1.1 GET /api/alerts
-(2026-05-22 00:49:28) [INFO    ] Request: 127.0.0.1:56561 0x8f65b0418 HTTP/1.1 GET /api/positions
-(2026-05-22 00:49:28) [INFO    ] Request: 127.0.0.1:56563 0x8f65aa018 HTTP/1.1 GET /api/candidates
-(2026-05-22 00:49:28) [INFO    ] Request: 127.0.0.1:56564 0x8f65b1818 HTTP/1.1 GET /api/instruments
-(2026-05-22 00:49:28) [INFO    ] Request: 127.0.0.1:56565 0x8f65ab418 HTTP/1.1 GET /api/sector_rotation
-(2026-05-22 00:49:28) [INFO    ] Response: 0x8f65b0418 /api/positions 200 0
-(2026-05-22 00:49:28) [INFO    ] Response: 0x8f65b1818 /api/instruments 200 0
-(2026-05-22 00:49:28) [INFO    ] Request: 127.0.0.1:56566 0x8f65ac818 HTTP/1.1 GET /api/settings
-(2026-05-22 00:49:28) [INFO    ] Response: 0x8f65ac818 /api/settings 200 0
-(2026-05-22 00:49:28) [INFO    ] Response: 0x8f65aa018 /api/candidates 200 0
-(2026-05-22 00:49:28) [INFO    ] Response: 0x8f65ab418 /api/sector_rotation 200 0
-(2026-05-22 00:49:28) [INFO    ] Request: 127.0.0.1:56561 0x8f65b0418 HTTP/1.1 GET /api/settings/saxo_token
-(2026-05-22 00:49:28) [INFO    ] Response: 0x8f65b0418 /api/settings/saxo_token 200 0
-(2026-05-22 00:49:28) [INFO    ] Response: 0x8f65adc18 /api/alerts 200 0
-(2026-05-22 00:49:33) [INFO    ] Request: 127.0.0.1:56564 0x8f65b1818 HTTP/1.1 GET /api/regime
-(2026-05-22 00:49:33) [INFO    ] Response: 0x8f65b1818 /api/regime 200 0
-(2026-05-22 00:49:33) [INFO    ] Request: 127.0.0.1:56566 0x8f65ac818 HTTP/1.1 GET /api/alerts
-(2026-05-22 00:49:33) [INFO    ] Request: 127.0.0.1:56563 0x8f65aa018 HTTP/1.1 GET /api/candidates
-(2026-05-22 00:49:33) [INFO    ] Request: 127.0.0.1:56565 0x8f65ab418 HTTP/1.1 GET /api/instruments
-(2026-05-22 00:49:33) [INFO    ] Response: 0x8f65aa018 /api/candidates 200 0
-(2026-05-22 00:49:33) [INFO    ] Response: 0x8f65ab418 /api/instruments 200 0
-(2026-05-22 00:49:33) [INFO    ] Request: 127.0.0.1:56561 0x8f65b0418 HTTP/1.1 GET /api/sector_rotation
-(2026-05-22 00:49:33) [INFO    ] Response: 0x8f65b0418 /api/sector_rotation 200 0
-(2026-05-22 00:49:33) [INFO    ] Request: 127.0.0.1:56562 0x8f65adc18 HTTP/1.1 GET /api/settings
-(2026-05-22 00:49:33) [INFO    ] Response: 0x8f65adc18 /api/settings 200 0
-(2026-05-22 00:49:33) [INFO    ] Request: 127.0.0.1:56564 0x8f65b1818 HTTP/1.1 GET /api/positions
-(2026-05-22 00:49:33) [INFO    ] Response: 0x8f65ac818 /api/alerts 200 0
-(2026-05-22 00:49:33) [INFO    ] Request: 127.0.0.1:56563 0x8f65aa018 HTTP/1.1 GET /api/settings/saxo_token
-(2026-05-22 00:49:33) [INFO    ] Response: 0x8f65b1818 /api/positions 200 0
-(2026-05-22 00:49:33) [INFO    ] Response: 0x8f65aa018 /api/settings/saxo_token 200 0
-[RegimeClassifier] Warning: Not enough SPY daily bars (need 219, got 1) for MA calculation. Falling back to default trend score.
-[RegimeClassifier] Evaluated date 2026-05-22: chop (vix=14.7336, oas=3.20433, breadth=0.746651, spx_vs_200ma=0)
-[ScreenD] Running Industry Rotation calculations for date: 2026-05-22
-[ScreenD] Industry Rotation calculations complete. Evaluated 70 instruments.
-[ScreenB] Running Swing Pullback calculations for date: 2026-05-22
-[ScreenB] Swing Pullback calculations complete. Registered 2 candidates.
-[ScreenE] Running CEF Discount calculations for date: 2026-05-22
-[ScreenF] Running Darvas Box Breakout calculations for date: 2026-05-22
-[ScreenG] Cross-Asset Divergence evaluation complete. Results: 3
-[ScreenC] Capitulation Wick Reversal evaluation complete. Results: 1
-(2026-05-22 00:49:39) [INFO    ] Request: 127.0.0.1:56565 0x8f65ab418 HTTP/1.1 GET /api/regime
-(2026-05-22 00:49:39) [INFO    ] Response: 0x8f65ab418 /api/regime 200 0
-(2026-05-22 00:49:39) [INFO    ] Request: 127.0.0.1:56561 0x8f65b0418 HTTP/1.1 GET /api/alerts
-(2026-05-22 00:49:39) [INFO    ] Request: 127.0.0.1:56562 0x8f65adc18 HTTP/1.1 GET /api/candidates
-(2026-05-22 00:49:39) [INFO    ] Request: 127.0.0.1:56566 0x8f65ac818 HTTP/1.1 GET /api/instruments
-(2026-05-22 00:49:39) [INFO    ] Response: 0x8f65adc18 /api/candidates 200 0
-(2026-05-22 00:49:39) [INFO    ] Response: 0x8f65ac818 /api/instruments 200 0
-(2026-05-22 00:49:39) [INFO    ] Request: 127.0.0.1:56564 0x8f65b1818 HTTP/1.1 GET /api/sector_rotation
-(2026-05-22 00:49:39) [INFO    ] Response: 0x8f65b1818 /api/sector_rotation 200 0
-(2026-05-22 00:49:39) [INFO    ] Request: 127.0.0.1:56563 0x8f65aa018 HTTP/1.1 GET /api/settings
-(2026-05-22 00:49:39) [INFO    ] Response: 0x8f65aa018 /api/settings 200 0
-(2026-05-22 00:49:39) [INFO    ] Request: 127.0.0.1:56565 0x8f65ab418 HTTP/1.1 GET /api/positions
-(2026-05-22 00:49:39) [INFO    ] Response: 0x8f65b0418 /api/alerts 200 0
-(2026-05-22 00:49:39) [INFO    ] Request: 127.0.0.1:56562 0x8f65adc18 HTTP/1.1 GET /api/settings/saxo_token
-(2026-05-22 00:49:39) [INFO    ] Response: 0x8f65ab418 /api/positions 200 0
-(2026-05-22 00:49:39) [INFO    ] Response: 0x8f65adc18 /api/settings/saxo_token 200 0
-(2026-05-22 00:49:44) [INFO    ] Request: 127.0.0.1:56566 0x8f65ac818 HTTP/1.1 GET /api/regime
-(2026-05-22 00:49:44) [INFO    ] Request: 127.0.0.1:56561 0x8f65b0418 HTTP/1.1 GET /api/instruments
-(2026-05-22 00:49:44) [INFO    ] Request: 127.0.0.1:56563 0x8f65aa018 HTTP/1.1 GET /api/candidates
-(2026-05-22 00:49:44) [INFO    ] Request: 127.0.0.1:56565 0x8f65ab418 HTTP/1.1 GET /api/sector_rotation
-(2026-05-22 00:49:44) [INFO    ] Request: 127.0.0.1:56564 0x8f65b1818 HTTP/1.1 GET /api/alerts
-(2026-05-22 00:49:44) [INFO    ] Request: 127.0.0.1:56562 0x8f65adc18 HTTP/1.1 GET /api/settings
-(2026-05-22 00:49:44) [INFO    ] Response: 0x8f65ac818 /api/regime 200 0
-(2026-05-22 00:49:44) [INFO    ] Response: 0x8f65adc18 /api/settings 200 0
-(2026-05-22 00:49:44) [INFO    ] Response: 0x8f65b0418 /api/instruments 200 0
-(2026-05-22 00:49:44) [INFO    ] Response: 0x8f65ab418 /api/sector_rotation 200 0
-(2026-05-22 00:49:44) [INFO    ] Request: 127.0.0.1:56566 0x8f65ac818 HTTP/1.1 GET /api/positions
-(2026-05-22 00:49:44) [INFO    ] Response: 0x8f65aa018 /api/candidates 200 0
-(2026-05-22 00:49:44) [INFO    ] Request: 127.0.0.1:56562 0x8f65adc18 HTTP/1.1 GET /api/settings/saxo_token
-(2026-05-22 00:49:44) [INFO    ] Response: 0x8f65ac818 /api/positions 200 0
-(2026-05-22 00:49:44) [INFO    ] Response: 0x8f65adc18 /api/settings/saxo_token 200 0
-(2026-05-22 00:49:44) [INFO    ] Response: 0x8f65b1818 /api/alerts 200 0
-[RegimeClassifier] Warning: Not enough SPY daily bars (need 219, got 1) for MA calculation. Falling back to default trend score.
-[RegimeClassifier] Evaluated date 2026-05-22: chop (vix=14.5192, oas=3.211, breadth=0.738562, spx_vs_200ma=0)
-[ScreenD] Running Industry Rotation calculations for date: 2026-05-22
-[ScreenD] Industry Rotation calculations complete. Evaluated 70 instruments.
-[ScreenB] Running Swing Pullback calculations for date: 2026-05-22
-[ScreenB] Swing Pullback calculations complete. Registered 2 candidates.
-[ScreenE] Running CEF Discount calculations for date: 2026-05-22
-[ScreenF] Running Darvas Box Breakout calculations for date: 2026-05-22
-[ScreenG] Cross-Asset Divergence evaluation complete. Results: 3
-[ScreenC] Capitulation Wick Reversal evaluation complete. Results: 1
-(2026-05-22 00:49:49) [INFO    ] Request: 127.0.0.1:56601 0x8f65af018 HTTP/1.1 GET /api/regime
-(2026-05-22 00:49:49) [INFO    ] Response: 0x8f65af018 /api/regime 200 0
-(2026-05-22 00:49:49) [INFO    ] Request: 127.0.0.1:56602 0x8f65aa018 HTTP/1.1 GET /api/alerts
-(2026-05-22 00:49:49) [INFO    ] Request: 127.0.0.1:56601 0x8f65af018 HTTP/1.1 GET /api/positions
-(2026-05-22 00:49:49) [INFO    ] Request: 127.0.0.1:56603 0x8f65ab418 HTTP/1.1 GET /api/candidates
-(2026-05-22 00:49:49) [INFO    ] Request: 127.0.0.1:56604 0x8f65b1818 HTTP/1.1 GET /api/instruments
-(2026-05-22 00:49:49) [INFO    ] Request: 127.0.0.1:56605 0x8f65ac818 HTTP/1.1 GET /api/sector_rotation
-(2026-05-22 00:49:49) [INFO    ] Response: 0x8f65af018 /api/positions 200 0
-(2026-05-22 00:49:49) [INFO    ] Request: 127.0.0.1:56606 0x8f65b0418 HTTP/1.1 GET /api/settings
-(2026-05-22 00:49:49) [INFO    ] Response: 0x8f65b0418 /api/settings 200 0
-(2026-05-22 00:49:49) [INFO    ] Response: 0x8f65b1818 /api/instruments 200 0
-(2026-05-22 00:49:49) [INFO    ] Response: 0x8f65ab418 /api/candidates 200 0
-(2026-05-22 00:49:49) [INFO    ] Response: 0x8f65ac818 /api/sector_rotation 200 0
-(2026-05-22 00:49:49) [INFO    ] Request: 127.0.0.1:56601 0x8f65af018 HTTP/1.1 GET /api/settings/saxo_token
-(2026-05-22 00:49:49) [INFO    ] Response: 0x8f65af018 /api/settings/saxo_token 200 0
-(2026-05-22 00:49:49) [INFO    ] Response: 0x8f65aa018 /api/alerts 200 0
-[TelegramBot] Received message: "/set-opportunities" from Chat ID: 5077709990
-[TelegramBot] Loaded chat configurations:
-  Premium Chat ID:     12345
-  Opportunity Chat ID: 12346
-  Digest Chat ID:      12347
-(2026-05-22 00:49:55) [INFO    ] Request: 127.0.0.1:56606 0x8f65b0418 HTTP/1.1 GET /api/regime
-(2026-05-22 00:49:55) [INFO    ] Response: 0x8f65b0418 /api/regime 200 0
-(2026-05-22 00:49:55) [INFO    ] Request: 127.0.0.1:56604 0x8f65b1818 HTTP/1.1 GET /api/alerts
-(2026-05-22 00:49:55) [INFO    ] Request: 127.0.0.1:56603 0x8f65ab418 HTTP/1.1 GET /api/candidates
-(2026-05-22 00:49:55) [INFO    ] Request: 127.0.0.1:56605 0x8f65ac818 HTTP/1.1 GET /api/instruments
-(2026-05-22 00:49:55) [INFO    ] Response: 0x8f65ab418 /api/candidates 200 0
-(2026-05-22 00:49:55) [INFO    ] Request: 127.0.0.1:56601 0x8f65af018 HTTP/1.1 GET /api/sector_rotation
-(2026-05-22 00:49:55) [INFO    ] Response: 0x8f65ac818 /api/instruments 200 0
-(2026-05-22 00:49:55) [INFO    ] Request: 127.0.0.1:56602 0x8f65aa018 HTTP/1.1 GET /api/settings
-(2026-05-22 00:49:55) [INFO    ] Response: 0x8f65aa018 /api/settings 200 0
-(2026-05-22 00:49:55) [INFO    ] Response: 0x8f65af018 /api/sector_rotation 200 0
-(2026-05-22 00:49:55) [INFO    ] Request: 127.0.0.1:56606 0x8f65b0418 HTTP/1.1 GET /api/positions
-(2026-05-22 00:49:55) [INFO    ] Response: 0x8f65b0418 /api/positions 200 0(2026-05-22 00:49:55) [INFO    ] Request: 127.0.0.1:56603 0x8f65ab418 HTTP/1.1 GET /api/settings/saxo_token
-
-(2026-05-22 00:49:55) [INFO    ] Response: 0x8f65b1818 /api/alerts 200 0
-(2026-05-22 00:49:55) [INFO    ] Response: 0x8f65ab418 /api/settings/saxo_token 200 0
-(2026-05-22 00:50:00) [INFO    ] Request: 127.0.0.1:56605 0x8f65ac818 HTTP/1.1 GET /api/regime
-(2026-05-22 00:50:00) [INFO    ] Request: 127.0.0.1:56602 0x8f65aa018 HTTP/1.1 GET /api/alerts
-(2026-05-22 00:50:00) [INFO    ] Response: 0x8f65ac818 /api/regime 200 0
-(2026-05-22 00:50:00) [INFO    ] Request: 127.0.0.1:56601 0x8f65af018 HTTP/1.1 GET /api/candidates
-(2026-05-22 00:50:00) [INFO    ] Request: 127.0.0.1:56606 0x8f65b0418 HTTP/1.1 GET /api/instruments
-(2026-05-22 00:50:00) [INFO    ] Response: 0x8f65af018 /api/candidates 200 0
-(2026-05-22 00:50:00) [INFO    ] Response: 0x8f65b0418 /api/instruments 200 0
-(2026-05-22 00:50:00) [INFO    ] Request: 127.0.0.1:56604 0x8f65b1818 HTTP/1.1 GET /api/sector_rotation
-(2026-05-22 00:50:00) [INFO    ] Response: 0x8f65b1818 /api/sector_rotation 200 0
-(2026-05-22 00:50:00) [INFO    ] Request: 127.0.0.1:56603 0x8f65ab418 HTTP/1.1 GET /api/settings
-(2026-05-22 00:50:00) [INFO    ] Response: 0x8f65ab418 /api/settings 200 0
-(2026-05-22 00:50:00) [INFO    ] Response: 0x8f65aa018 /api/alerts 200 0
-(2026-05-22 00:50:00) [INFO    ] Request: 127.0.0.1:56605 0x8f65ac818 HTTP/1.1 GET /api/positions
-(2026-05-22 00:50:00) [INFO    ] Request: 127.0.0.1:56601 0x8f65af018 HTTP/1.1 GET /api/settings/saxo_token
-(2026-05-22 00:50:00) [INFO    ] Response: 0x8f65ac818 /api/positions 200 0
-(2026-05-22 00:50:00) [INFO    ] Response: 0x8f65af018 /api/settings/saxo_token 200 0
-[RegimeClassifier] Warning: Not enough SPY daily bars (need 219, got 1) for MA calculation. Falling back to default trend score.
-[RegimeClassifier] Evaluated date 2026-05-22: chop (vix=14.7084, oas=3.26081, breadth=0.752758, spx_vs_200ma=0)
-[ScreenD] Running Industry Rotation calculations for date: 2026-05-22
-[ScreenD] Industry Rotation calculations complete. Evaluated 70 instruments.
-[ScreenB] Running Swing Pullback calculations for date: 2026-05-22
-[ScreenB] Swing Pullback calculations complete. Registered 2 candidates.
-[ScreenE] Running CEF Discount calculations for date: 2026-05-22
-[ScreenF] Running Darvas Box Breakout calculations for date: 2026-05-22
-[ScreenG] Cross-Asset Divergence evaluation complete. Results: 3
-[ScreenC] Capitulation Wick Reversal evaluation complete. Results: 1
-(2026-05-22 00:50:05) [INFO    ] Request: 127.0.0.1:56606 0x8f65b0418 HTTP/1.1 GET /api/regime
-(2026-05-22 00:50:05) [INFO    ] Response: 0x8f65b0418 /api/regime 200 0
-(2026-05-22 00:50:05) [INFO    ] Request: 127.0.0.1:56604 0x8f65b1818 HTTP/1.1 GET /api/alerts
-(2026-05-22 00:50:05) [INFO    ] Request: 127.0.0.1:56603 0x8f65ab418 HTTP/1.1 GET /api/candidates
-(2026-05-22 00:50:05) [INFO    ] Request: 127.0.0.1:56602 0x8f65aa018 HTTP/1.1 GET /api/instruments
-(2026-05-22 00:50:05) [INFO    ] Response: 0x8f65ab418 /api/candidates 200 0
-(2026-05-22 00:50:05) [INFO    ] Response: 0x8f65aa018 /api/instruments 200 0
-(2026-05-22 00:50:05) [INFO    ] Request: 127.0.0.1:56605 0x8f65ac818 HTTP/1.1 GET /api/sector_rotation
-(2026-05-22 00:50:05) [INFO    ] Response: 0x8f65ac818 /api/sector_rotation 200 0
-(2026-05-22 00:50:05) [INFO    ] Request: 127.0.0.1:56601 0x8f65af018 HTTP/1.1 GET /api/settings
-(2026-05-22 00:50:05) [INFO    ] Response: 0x8f65af018 /api/settings 200 0
-(2026-05-22 00:50:05) [INFO    ] Response: 0x8f65b1818 /api/alerts 200 0
-(2026-05-22 00:50:05) [INFO    ] Request: 127.0.0.1:56606 0x8f65b0418 HTTP/1.1 GET /api/positions
-(2026-05-22 00:50:05) [INFO    ] Request: 127.0.0.1:56603 0x8f65ab418 HTTP/1.1 GET /api/settings/saxo_token
-(2026-05-22 00:50:05) [INFO    ] Response: 0x8f65b0418 /api/positions 200 0
-(2026-05-22 00:50:05) [INFO    ] Response: 0x8f65ab418 /api/settings/saxo_token 200 0
-(2026-05-22 00:50:10) [INFO    ] Request: 127.0.0.1:56602 0x8f65aa018 HTTP/1.1 GET /api/regime
-(2026-05-22 00:50:10) [INFO    ] Response: 0x8f65aa018 /api/regime 200 0
-(2026-05-22 00:50:10) [INFO    ] Request: 127.0.0.1:56605 0x8f65ac818 HTTP/1.1 GET /api/alerts
-(2026-05-22 00:50:10) [INFO    ] Request: 127.0.0.1:56601 0x8f65af018 HTTP/1.1 GET /api/candidates
-(2026-05-22 00:50:10) [INFO    ] Request: 127.0.0.1:56604 0x8f65b1818 HTTP/1.1 GET /api/instruments
-(2026-05-22 00:50:10) [INFO    ] Response: 0x8f65af018 /api/candidates 200 0
-(2026-05-22 00:50:10) [INFO    ] Response: 0x8f65b1818 /api/instruments 200 0
-(2026-05-22 00:50:10) [INFO    ] Request: 127.0.0.1:56606 0x8f65b0418 HTTP/1.1 GET /api/sector_rotation
-(2026-05-22 00:50:10) [INFO    ] Request: 127.0.0.1:56603 0x8f65ab418 HTTP/1.1 GET /api/settings
-(2026-05-22 00:50:10) [INFO    ] Response: 0x8f65b0418 /api/sector_rotation 200 0
-(2026-05-22 00:50:10) [INFO    ] Response: 0x8f65ab418 /api/settings 200 0
-(2026-05-22 00:50:10) [INFO    ] Request: 127.0.0.1:56602 0x8f65aa018 HTTP/1.1 GET /api/positions
-(2026-05-22 00:50:10) [INFO    ] Response: 0x8f65ac818 /api/alerts 200 0
-(2026-05-22 00:50:10) [INFO    ] Request: 127.0.0.1:56601 0x8f65af018 HTTP/1.1 GET /api/settings/saxo_token
-(2026-05-22 00:50:10) [INFO    ] Response: 0x8f65aa018 /api/positions 200 0
-(2026-05-22 00:50:10) [INFO    ] Response: 0x8f65af018 /api/settings/saxo_token 200 0
-(2026-05-22 00:50:15) [INFO    ] Request: 127.0.0.1:56647 0x8f65adc18 HTTP/1.1 GET /api/regime
-(2026-05-22 00:50:15) [INFO    ] Response: 0x8f65adc18 /api/regime 200 0
-(2026-05-22 00:50:15) [INFO    ] Request: 127.0.0.1:56648 0x8f65b0418 HTTP/1.1 GET /api/alerts
-(2026-05-22 00:50:15) [INFO    ] Request: 127.0.0.1:56647 0x8f65adc18 HTTP/1.1 GET /api/positions
-(2026-05-22 00:50:15) [INFO    ] Request: 127.0.0.1:56649 0x8f65af018 HTTP/1.1 GET /api/candidates
-(2026-05-22 00:50:15) [INFO    ] Request: 127.0.0.1:56650 0x8f65b1818 HTTP/1.1 GET /api/instruments
-(2026-05-22 00:50:15) [INFO    ] Request: 127.0.0.1:56651 0x8f65ab418 HTTP/1.1 GET /api/sector_rotation
-(2026-05-22 00:50:15) [INFO    ] Response: 0x8f65adc18 /api/positions 200 0
-(2026-05-22 00:50:15) [INFO    ] Request: 127.0.0.1:56652 0x8f65aa018 HTTP/1.1 GET /api/settings
-(2026-05-22 00:50:15) [INFO    ] Response: 0x8f65b1818 /api/instruments 200 0
-(2026-05-22 00:50:15) [INFO    ] Response: 0x8f65aa018 /api/settings 200 0
-(2026-05-22 00:50:15) [INFO    ] Response: 0x8f65af018 /api/candidates 200 0
-(2026-05-22 00:50:15) [INFO    ] Response: 0x8f65ab418 /api/sector_rotation 200 0
-(2026-05-22 00:50:15) [INFO    ] Request: 127.0.0.1:56647 0x8f65adc18 HTTP/1.1 GET /api/settings/saxo_token
-(2026-05-22 00:50:15) [INFO    ] Response: 0x8f65adc18 /api/settings/saxo_token 200 0
-(2026-05-22 00:50:15) [INFO    ] Response: 0x8f65b0418 /api/alerts 200 0
-[RegimeClassifier] Warning: Not enough SPY daily bars (need 219, got 1) for MA calculation. Falling back to default trend score.
-[RegimeClassifier] Evaluated date 2026-05-22: chop (vix=14.7451, oas=3.26618, breadth=0.734161, spx_vs_200ma=0)
-[ScreenD] Running Industry Rotation calculations for date: 2026-05-22
-[ScreenD] Industry Rotation calculations complete. Evaluated 70 instruments.
-[ScreenB] Running Swing Pullback calculations for date: 2026-05-22
-[ScreenB] Swing Pullback calculations complete. Registered 2 candidates.
-[ScreenE] Running CEF Discount calculations for date: 2026-05-22
-[ScreenF] Running Darvas Box Breakout calculations for date: 2026-05-22
-[ScreenG] Cross-Asset Divergence evaluation complete. Results: 3
-[ScreenC] Capitulation Wick Reversal evaluation complete. Results: 1
-(2026-05-22 00:50:20) [INFO    ] Request: 127.0.0.1:56650 0x8f65b1818 HTTP/1.1 GET /api/regime
-(2026-05-22 00:50:20) [INFO    ] Response: 0x8f65b1818 /api/regime 200 0
-(2026-05-22 00:50:20) [INFO    ] Request: 127.0.0.1:56652 0x8f65aa018 HTTP/1.1 GET /api/alerts
-(2026-05-22 00:50:20) [INFO    ] Request: 127.0.0.1:56649 0x8f65af018 HTTP/1.1 GET /api/candidates
-(2026-05-22 00:50:20) [INFO    ] Request: 127.0.0.1:56651 0x8f65ab418 HTTP/1.1 GET /api/instruments
-(2026-05-22 00:50:20) [INFO    ] Response: 0x8f65af018 /api/candidates 200 0
-(2026-05-22 00:50:20) [INFO    ] Response: 0x8f65ab418 /api/instruments 200 0
-(2026-05-22 00:50:20) [INFO    ] Request: 127.0.0.1:56647 0x8f65adc18 HTTP/1.1 GET /api/sector_rotation
-(2026-05-22 00:50:20) [INFO    ] Response: 0x8f65adc18 /api/sector_rotation 200 0
-(2026-05-22 00:50:20) [INFO    ] Request: 127.0.0.1:56648 0x8f65b0418 HTTP/1.1 GET /api/settings
-(2026-05-22 00:50:20) [INFO    ] Response: 0x8f65b0418 /api/settings 200 0
-(2026-05-22 00:50:20) [INFO    ] Response: 0x8f65aa018 /api/alerts 200 0
-(2026-05-22 00:50:20) [INFO    ] Request: 127.0.0.1:56650 0x8f65b1818 HTTP/1.1 GET /api/positions
-(2026-05-22 00:50:20) [INFO    ] Request: 127.0.0.1:56649 0x8f65af018 HTTP/1.1 GET /api/settings/saxo_token
-(2026-05-22 00:50:20) [INFO    ] Response: 0x8f65b1818 /api/positions 200 0
-(2026-05-22 00:50:20) [INFO    ] Response: 0x8f65af018 /api/settings/saxo_token 200 0
-[TelegramBot] Loaded chat configurations:
-  Premium Chat ID:     12345
-  Opportunity Chat ID: 12346
-  Digest Chat ID:      12347
-(2026-05-22 00:50:26) [INFO    ] Request: 127.0.0.1:56651 0x8f65ab418 HTTP/1.1 GET /api/regime
-(2026-05-22 00:50:26) [INFO    ] Response: 0x8f65ab418 /api/regime 200 0
-(2026-05-22 00:50:26) [INFO    ] Request: 127.0.0.1:56647 0x8f65adc18 HTTP/1.1 GET /api/alerts
-(2026-05-22 00:50:26) [INFO    ] Request: 127.0.0.1:56648 0x8f65b0418 HTTP/1.1 GET /api/candidates
-(2026-05-22 00:50:26) [INFO    ] Request: 127.0.0.1:56652 0x8f65aa018 HTTP/1.1 GET /api/instruments
-(2026-05-22 00:50:26) [INFO    ] Response: 0x8f65b0418 /api/candidates 200 0
-(2026-05-22 00:50:26) [INFO    ] Response: 0x8f65aa018 /api/instruments 200 0
-(2026-05-22 00:50:26) [INFO    ] Request: 127.0.0.1:56650 0x8f65b1818 HTTP/1.1 GET /api/sector_rotation
-(2026-05-22 00:50:26) [INFO    ] Response: 0x8f65b1818 /api/sector_rotation 200 0
-(2026-05-22 00:50:26) [INFO    ] Request: 127.0.0.1:56649 0x8f65af018 HTTP/1.1 GET /api/settings
-(2026-05-22 00:50:26) [INFO    ] Response: 0x8f65af018 /api/settings 200 0
-(2026-05-22 00:50:26) [INFO    ] Request: 127.0.0.1:56651 0x8f65ab418 HTTP/1.1 GET /api/positions
-(2026-05-22 00:50:26) [INFO    ] Response: 0x8f65adc18 /api/alerts 200 0
-(2026-05-22 00:50:26) [INFO    ] Request: 127.0.0.1:56648 0x8f65b0418 HTTP/1.1 GET /api/settings/saxo_token
-(2026-05-22 00:50:26) [INFO    ] Response: 0x8f65ab418 /api/positions 200 0
-(2026-05-22 00:50:26) [INFO    ] Response: 0x8f65b0418 /api/settings/saxo_token 200 0
-[RegimeClassifier] Warning: Not enough SPY daily bars (need 219, got 1) for MA calculation. Falling back to default trend score.
-[RegimeClassifier] Evaluated date 2026-05-22: chop (vix=15.1584, oas=3.326, breadth=0.719729, spx_vs_200ma=0)
-[ScreenD] Running Industry Rotation calculations for date: 2026-05-22
-[ScreenD] Industry Rotation calculations complete. Evaluated 70 instruments.
-[ScreenB] Running Swing Pullback calculations for date: 2026-05-22
-[ScreenB] Swing Pullback calculations complete. Registered 2 candidates.
-[ScreenE] Running CEF Discount calculations for date: 2026-05-22
-[ScreenF] Running Darvas Box Breakout calculations for date: 2026-05-22
-[ScreenG] Cross-Asset Divergence evaluation complete. Results: 3
-[ScreenC] Capitulation Wick Reversal evaluation complete. Results: 1
-(2026-05-22 00:50:35) [INFO    ] Request: 127.0.0.1:56680 0x8f65ac818 HTTP/1.1 GET /api/regime
-(2026-05-22 00:50:35) [INFO    ] Response: 0x8f65ac818 /api/regime 200 0
-(2026-05-22 00:50:35) [INFO    ] Request: 127.0.0.1:56681 0x8f65b0418 HTTP/1.1 GET /api/alerts
-(2026-05-22 00:50:35) [INFO    ] Request: 127.0.0.1:56680 0x8f65ac818 HTTP/1.1 GET /api/positions
-(2026-05-22 00:50:35) [INFO    ] Request: 127.0.0.1:56682 0x8f65adc18 HTTP/1.1 GET /api/candidates
-(2026-05-22 00:50:35) [INFO    ] Request: 127.0.0.1:56683 0x8f65ab418 HTTP/1.1 GET /api/instruments
-(2026-05-22 00:50:35) [INFO    ] Request: 127.0.0.1:56684 0x8f65b1818 HTTP/1.1 GET /api/sector_rotation
-(2026-05-22 00:50:35) [INFO    ] Response: 0x8f65ac818 /api/positions 200 0
-(2026-05-22 00:50:35) [INFO    ] Request: 127.0.0.1:56685 0x8f65aa018 HTTP/1.1 GET /api/settings
-(2026-05-22 00:50:35) [INFO    ] Response: 0x8f65ab418 /api/instruments 200 0
-(2026-05-22 00:50:35) [INFO    ] Response: 0x8f65aa018 /api/settings 200 0
-(2026-05-22 00:50:35) [INFO    ] Response: 0x8f65adc18 /api/candidates 200 0
-(2026-05-22 00:50:35) [INFO    ] Response: 0x8f65b1818 /api/sector_rotation 200 0
-(2026-05-22 00:50:35) [INFO    ] Request: 127.0.0.1:56680 0x8f65ac818 HTTP/1.1 GET /api/settings/saxo_token
-(2026-05-22 00:50:35) [INFO    ] Response: 0x8f65ac818 /api/settings/saxo_token 200 0
-(2026-05-22 00:50:35) [INFO    ] Response: 0x8f65b0418 /api/alerts 200 0
-[TelegramBot] Received message: "/set_digest" from Chat ID: 5077709990
-[TelegramBot] Loaded chat configurations:
-  Premium Chat ID:     12345
-  Opportunity Chat ID: 12346
-  Digest Chat ID:      5077709990
-[TelegramBot] Loaded chat configurations:
-  Premium Chat ID:     12345
-  Opportunity Chat ID: 12346
-  Digest Chat ID:      5077709990
-(2026-05-22 00:50:41) [INFO    ] Closing IO service 0x8f68aaa00
-(2026-05-22 00:50:41) [INFO    ] Closing IO service 0x8f68aaa08
-(2026-05-22 00:50:41) [INFO    ] Closing IO service 0x8f68aaa10
-(2026-05-22 00:50:41) [INFO    ] Closing IO service 0x8f68aaa18
-(2026-05-22 00:50:41) [INFO    ] Closing IO service 0x8f68aaa20
-(2026-05-22 00:50:41) [INFO    ] Closing IO service 0x8f68aaa28
-(2026-05-22 00:50:41) [INFO    ] Closing IO service 0x8f68aaa30
-(2026-05-22 00:50:41) [INFO    ] Closing IO service 0x8f68aaa38
-(2026-05-22 00:50:41) [INFO    ] Closing IO service 0x8f68aaa40
-(2026-05-22 00:50:41) [INFO    ] Closing main IO service (0x1013df378)
-(2026-05-22 00:50:41) [INFO    ] Exiting.
+  Premium Chat ID:     5077709990
+  Opportunity Chat ID: [EMPTY]
+  Digest Chat ID:      [EMPTY]
+(2026-05-22 01:20:24) [INFO    ] Request: 127.0.0.1:60136 0xc24c92818 HTTP/1.1 GET /api/regime
+(2026-05-22 01:20:24) [INFO    ] Response: 0xc24c92818 /api/regime 200 0
+(2026-05-22 01:20:24) [INFO    ] Request: 127.0.0.1:60139 0xc24c96418 HTTP/1.1 GET /api/alerts
+(2026-05-22 01:20:24) [INFO    ] Request: 127.0.0.1:60134 0xc24c91418 HTTP/1.1 GET /api/candidates
+(2026-05-22 01:20:24) [INFO    ] Request: 127.0.0.1:60138 0xc24c95018 HTTP/1.1 GET /api/instruments
+(2026-05-22 01:20:24) [INFO    ] Response: 0xc24c91418 /api/candidates 200 0
+(2026-05-22 01:20:24) [INFO    ] Request: 127.0.0.1:60133 0x101e7de18 HTTP/1.1 GET /api/sector_rotation
+(2026-05-22 01:20:24) [INFO    ] Response: 0xc24c95018 /api/instruments 200 0
+(2026-05-22 01:20:24) [INFO    ] Request: 127.0.0.1:60137 0xc24c93c18 HTTP/1.1 GET /api/settings
+(2026-05-22 01:20:24) [INFO    ] Response: 0xc24c93c18 /api/settings 200 0
+(2026-05-22 01:20:24) [INFO    ] Response: 0x101e7de18 /api/sector_rotation 200 0
+(2026-05-22 01:20:24) [INFO    ] Request: 127.0.0.1:60136 0xc24c92818 HTTP/1.1 GET /api/positions
+(2026-05-22 01:20:24) [INFO    ] Request: 127.0.0.1:60134 0xc24c91418 HTTP/1.1 GET /api/settings/saxo_token
+(2026-05-22 01:20:24) [INFO    ] Response: 0xc24c92818 /api/positions 200 0
+(2026-05-22 01:20:24) [INFO    ] Response: 0xc24c91418 /api/settings/saxo_token 200 0
+(2026-05-22 01:20:24) [INFO    ] Response: 0xc24c96418 /api/alerts 200 0
+(2026-05-22 01:20:26) [INFO    ] Request: 127.0.0.1:60138 0xc24c95018 HTTP/1.1 GET /api/whatsapp_status
+(2026-05-22 01:20:26) [INFO    ] Response: 0xc24c95018 /api/whatsapp_status 200 0
+(2026-05-22 01:20:29) [INFO    ] Request: 127.0.0.1:60137 0xc24c93c18 HTTP/1.1 GET /api/whatsapp_status
+(2026-05-22 01:20:29) [INFO    ] Response: 0xc24c93c18 /api/whatsapp_status 200 0
+(2026-05-22 01:20:29) [INFO    ] Request: 127.0.0.1:60133 0x101e7de18 HTTP/1.1 GET /api/regime
+(2026-05-22 01:20:29) [INFO    ] Response: 0x101e7de18 /api/regime 200 0
+(2026-05-22 01:20:29) [INFO    ] Request: 127.0.0.1:60136 0xc24c92818 HTTP/1.1 GET /api/alerts
+(2026-05-22 01:20:29) [INFO    ] Request: 127.0.0.1:60134 0xc24c91418 HTTP/1.1 GET /api/candidates
+(2026-05-22 01:20:29) [INFO    ] Request: 127.0.0.1:60139 0xc24c96418 HTTP/1.1 GET /api/instruments
+(2026-05-22 01:20:29) [INFO    ] Response: 0xc24c91418 /api/candidates 200 0
+(2026-05-22 01:20:29) [INFO    ] Response: 0xc24c96418 /api/instruments 200 0
+(2026-05-22 01:20:29) [INFO    ] Request: 127.0.0.1:60138 0xc24c95018 HTTP/1.1 GET /api/sector_rotation
+(2026-05-22 01:20:29) [INFO    ] Request: 127.0.0.1:60137 0xc24c93c18 HTTP/1.1 GET /api/settings
+(2026-05-22 01:20:29) [INFO    ] Response: 0xc24c95018 /api/sector_rotation 200 0
+(2026-05-22 01:20:29) [INFO    ] Response: 0xc24c93c18 /api/settings 200 0
+(2026-05-22 01:20:29) [INFO    ] Request: 127.0.0.1:60133 0x101e7de18 HTTP/1.1 GET /api/positions
+(2026-05-22 01:20:29) [INFO    ] Request: 127.0.0.1:60134 0xc24c91418 HTTP/1.1 GET /api/settings/saxo_token
+(2026-05-22 01:20:29) [INFO    ] Response: 0xc24c92818 /api/alerts 200 0
+(2026-05-22 01:20:29) [INFO    ] Response: 0x101e7de18 /api/positions 200 0
+(2026-05-22 01:20:29) [INFO    ] Response: 0xc24c91418 /api/settings/saxo_token 200 0
+(2026-05-22 01:20:32) [INFO    ] Request: 127.0.0.1:60139 0xc24c96418 HTTP/1.1 GET /api/whatsapp_status
+(2026-05-22 01:20:32) [INFO    ] Response: 0xc24c96418 /api/whatsapp_status 200 0
+(2026-05-22 01:20:34) [INFO    ] Request: 127.0.0.1:60137 0xc24c93c18 HTTP/1.1 GET /api/regime
+(2026-05-22 01:20:34) [INFO    ] Response: 0xc24c93c18 /api/regime 200 0
+(2026-05-22 01:20:34) [INFO    ] Request: 127.0.0.1:60138 0xc24c95018 HTTP/1.1 GET /api/alerts
+(2026-05-22 01:20:34) [INFO    ] Request: 127.0.0.1:60136 0xc24c92818 HTTP/1.1 GET /api/candidates
+(2026-05-22 01:20:34) [INFO    ] Request: 127.0.0.1:60133 0x101e7de18 HTTP/1.1 GET /api/instruments
+(2026-05-22 01:20:34) [INFO    ] Response: 0xc24c92818 /api/candidates 200 0
+(2026-05-22 01:20:34) [INFO    ] Response: 0x101e7de18 /api/instruments 200 0
+(2026-05-22 01:20:34) [INFO    ] Request: 127.0.0.1:60134 0xc24c91418 HTTP/1.1 GET /api/sector_rotation
+(2026-05-22 01:20:34) [INFO    ] Response: 0xc24c91418 /api/sector_rotation 200 0
+(2026-05-22 01:20:34) [INFO    ] Request: 127.0.0.1:60139 0xc24c96418 HTTP/1.1 GET /api/settings
+(2026-05-22 01:20:34) [INFO    ] Response: 0xc24c96418 /api/settings 200 0
+(2026-05-22 01:20:34) [INFO    ] Request: 127.0.0.1:60137 0xc24c93c18 HTTP/1.1 GET /api/positions
+(2026-05-22 01:20:34) [INFO    ] Response: 0xc24c95018 /api/alerts 200 0
+(2026-05-22 01:20:34) [INFO    ] Request: 127.0.0.1:60136 0xc24c92818 HTTP/1.1 GET /api/settings/saxo_token
+(2026-05-22 01:20:34) [INFO    ] Response: 0xc24c93c18 /api/positions 200 0
+(2026-05-22 01:20:34) [INFO    ] Response: 0xc24c92818 /api/settings/saxo_token 200 0
+(2026-05-22 01:20:35) [INFO    ] Request: 127.0.0.1:60133 0x101e7de18 HTTP/1.1 GET /api/whatsapp_status
+(2026-05-22 01:20:35) [INFO    ] Response: 0x101e7de18 /api/whatsapp_status 200 0
+[Engine] Shutting down background components...
+(2026-05-22 01:20:38) [INFO    ] Request: 127.0.0.1:60134 0xc24c91418 HTTP/1.1 GET /api/whatsapp_status
+(2026-05-22 01:20:38) [INFO    ] Response: 0xc24c91418 /api/whatsapp_status 200 0
+(2026-05-22 01:20:39) [INFO    ] Request: 127.0.0.1:60139 0xc24c96418 HTTP/1.1 GET /api/regime
+(2026-05-22 01:20:39) [INFO    ] Response: 0xc24c96418 /api/regime 200 0
+(2026-05-22 01:20:39) [INFO    ] Request: 127.0.0.1:60138 0xc24c95018 HTTP/1.1 GET /api/alerts
+(2026-05-22 01:20:39) [INFO    ] Request: 127.0.0.1:60137 0xc24c93c18 HTTP/1.1 GET /api/candidates
+(2026-05-22 01:20:39) [INFO    ] Request: 127.0.0.1:60136 0xc24c92818 HTTP/1.1 GET /api/instruments
+(2026-05-22 01:20:39) [INFO    ] Response: 0xc24c93c18 /api/candidates 200 0
+(2026-05-22 01:20:39) [INFO    ] Response: 0xc24c92818 /api/instruments 200 0
+(2026-05-22 01:20:39) [INFO    ] Request: 127.0.0.1:60133 0x101e7de18 HTTP/1.1 GET /api/sector_rotation
+(2026-05-22 01:20:39) [INFO    ] Response: 0x101e7de18 /api/sector_rotation 200 0
+(2026-05-22 01:20:39) [INFO    ] Request: 127.0.0.1:60134 0xc24c91418 HTTP/1.1 GET /api/settings
+(2026-05-22 01:20:39) [INFO    ] Response: 0xc24c91418 /api/settings 200 0
+(2026-05-22 01:20:39) [INFO    ] Request: 127.0.0.1:60139 0xc24c96418 HTTP/1.1 GET /api/positions
+(2026-05-22 01:20:39) [INFO    ] Request: 127.0.0.1:60137 0xc24c93c18 HTTP/1.1 GET /api/settings/saxo_token
+(2026-05-22 01:20:39) [INFO    ] Response: 0xc24c95018 /api/alerts 200 0
+(2026-05-22 01:20:39) [INFO    ] Response: 0xc24c96418 /api/positions 200 0
+(2026-05-22 01:20:39) [INFO    ] Response: 0xc24c93c18 /api/settings/saxo_token 200 0
+(2026-05-22 01:20:42) [INFO    ] Request: 127.0.0.1:60136 0xc24c92818 HTTP/1.1 GET /api/whatsapp_status
+(2026-05-22 01:20:42) [INFO    ] Response: 0xc24c92818 /api/whatsapp_status 200 0
+[PositionManager] Background thread stopped.
+(2026-05-22 01:20:45) [INFO    ] Request: 127.0.0.1:60133 0x101e7de18 HTTP/1.1 GET /api/regime
+(2026-05-22 01:20:45) [INFO    ] Response: 0x101e7de18 /api/regime 200 0
+(2026-05-22 01:20:45) [INFO    ] Request: 127.0.0.1:60134 0xc24c91418 HTTP/1.1 GET /api/alerts
+(2026-05-22 01:20:45) [INFO    ] Request: 127.0.0.1:60138 0xc24c95018 HTTP/1.1 GET /api/candidates
+(2026-05-22 01:20:45) [INFO    ] Request: 127.0.0.1:60139 0xc24c96418 HTTP/1.1 GET /api/instruments
+(2026-05-22 01:20:45) [INFO    ] Request: 127.0.0.1:60137 0xc24c93c18 HTTP/1.1 GET /api/sector_rotation
+(2026-05-22 01:20:45) [INFO    ] Response: 0xc24c96418 /api/instruments 200 0
+(2026-05-22 01:20:45) [INFO    ] Response: 0xc24c95018 /api/candidates 200 0
+(2026-05-22 01:20:45) [INFO    ] Request: 127.0.0.1:60136 0xc24c92818 HTTP/1.1 GET /api/settings
+(2026-05-22 01:20:45) [INFO    ] Response: 0xc24c93c18 /api/sector_rotation 200 0
+(2026-05-22 01:20:45) [INFO    ] Response: 0xc24c92818 /api/settings 200 0
+(2026-05-22 01:20:45) [INFO    ] Request: 127.0.0.1:60133 0x101e7de18 HTTP/1.1 GET /api/positions
+(2026-05-22 01:20:45) [INFO    ] Request: 127.0.0.1:60139 0xc24c96418 HTTP/1.1 GET /api/settings/saxo_token
+(2026-05-22 01:20:45) [INFO    ] Response: 0x101e7de18 /api/positions 200 0
+(2026-05-22 01:20:45) [INFO    ] Response: 0xc24c96418 /api/settings/saxo_token 200 0
+(2026-05-22 01:20:45) [INFO    ] Response: 0xc24c91418 /api/alerts 200 0
+(2026-05-22 01:20:46) [INFO    ] Request: 127.0.0.1:60138 0xc24c95018 HTTP/1.1 GET /api/whatsapp_status
+(2026-05-22 01:20:46) [INFO    ] Response: 0xc24c95018 /api/whatsapp_status 200 0
+(2026-05-22 01:20:50) [INFO    ] Request: 127.0.0.1:60137 0xc24c93c18 HTTP/1.1 GET /api/whatsapp_status
+(2026-05-22 01:20:50) [INFO    ] Response: 0xc24c93c18 /api/whatsapp_status 200 0
+(2026-05-22 01:20:51) [INFO    ] Request: 127.0.0.1:60138 0xc24c95018 HTTP/1.1 GET /api/regime
+(2026-05-22 01:20:51) [INFO    ] Response: 0xc24c95018 /api/regime 200 0
+(2026-05-22 01:20:51) [INFO    ] Request: 127.0.0.1:60137 0xc24c93c18 HTTP/1.1 GET /api/alerts
+(2026-05-22 01:20:51) [INFO    ] Response: 0xc24c93c18 /api/alerts 200 0
+(2026-05-22 01:20:51) [INFO    ] Request: 127.0.0.1:60193 0xc24c9a018 HTTP/1.1 GET /api/candidates
+(2026-05-22 01:20:51) [INFO    ] Request: 127.0.0.1:60138 0xc24c95018 HTTP/1.1 GET /api/positions
+(2026-05-22 01:20:51) [INFO    ] Request: 127.0.0.1:60194 0xc24c91418 HTTP/1.1 GET /api/instruments
+(2026-05-22 01:20:51) [INFO    ] Request: 127.0.0.1:60195 0xc24c92818 HTTP/1.1 GET /api/sector_rotation
+(2026-05-22 01:20:51) [INFO    ] Response: 0xc24c9a018 /api/candidates 200 0
+(2026-05-22 01:20:51) [INFO    ] Request: 127.0.0.1:60196 0xc24c96418 HTTP/1.1 GET /api/settings
+(2026-05-22 01:20:51) [INFO    ] Response: 0xc24c91418 /api/instruments 200 0
+(2026-05-22 01:20:51) [INFO    ] Response: 0xc24c96418 /api/settings 200 0
+(2026-05-22 01:20:51) [INFO    ] Response: 0xc24c95018 /api/positions 200 0
+(2026-05-22 01:20:51) [INFO    ] Request: 127.0.0.1:60137 0xc24c93c18 HTTP/1.1 GET /api/settings/saxo_token
+(2026-05-22 01:20:51) [INFO    ] Response: 0xc24c92818 /api/sector_rotation 200 0
+(2026-05-22 01:20:51) [INFO    ] Response: 0xc24c93c18 /api/settings/saxo_token 200 0
+[AlertDispatcher] Alert Dispatcher threads stopped.
+(2026-05-22 01:20:54) [INFO    ] Request: 127.0.0.1:60193 0xc24c9a018 HTTP/1.1 GET /api/whatsapp_status
+(2026-05-22 01:20:54) [INFO    ] Response: 0xc24c9a018 /api/whatsapp_status 200 0
+(2026-05-22 01:20:55) [INFO    ] Closing IO service 0x101e7be80
+(2026-05-22 01:20:55) [INFO    ] Closing IO service 0x101e7be88
+(2026-05-22 01:20:55) [INFO    ] Closing IO service 0x101e7be90
+(2026-05-22 01:20:55) [INFO    ] Closing IO service 0x101e7be98
+(2026-05-22 01:20:55) [INFO    ] Closing IO service 0x101e7bea0
+(2026-05-22 01:20:55) [INFO    ] Closing IO service 0x101e7bea8
+(2026-05-22 01:20:55) [INFO    ] Closing IO service 0x101e7beb0
+(2026-05-22 01:20:55) [INFO    ] Closing IO service 0x101e7beb8
+(2026-05-22 01:20:55) [INFO    ] Closing IO service 0x101e7bec0
+(2026-05-22 01:20:55) [INFO    ] Closing main IO service (0x101e7b418)
+(2026-05-22 01:20:55) [INFO    ] Exiting.
+[Engine] Shutdown complete. Goodbye.

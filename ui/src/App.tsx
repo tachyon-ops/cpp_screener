@@ -184,8 +184,12 @@ function App() {
   const [showAppKey, setShowAppKey] = useState(false);
   const [showAppSecret, setShowAppSecret] = useState(false);
   const [showTgToken, setShowTgToken] = useState(false);
+  const [_showAdvancedSettings, _setShowAdvancedSettings] = useState(false);
   const [testingTelegram, setTestingTelegram] = useState(false);
   const [testingWhatsapp, setTestingWhatsapp] = useState(false);
+  const [waStatus, setWaStatus] = useState<{state: string; pairing_code: string; error_message: string; updated_at: string}>({
+    state: 'disconnected', pairing_code: '', error_message: '', updated_at: ''
+  });
   const [showAccessToken, setShowAccessToken] = useState(false);
   const [showRefreshToken, setShowRefreshToken] = useState(false);
   
@@ -263,6 +267,25 @@ function App() {
     }
   };
 
+  // Poll WhatsApp status when on settings tab
+  useEffect(() => {
+    if (activeTab !== 'settings') return;
+    const fetchWaStatus = async () => {
+      try {
+        const res = await fetch('/api/whatsapp_status');
+        if (res.ok) {
+          const data = await res.json();
+          setWaStatus(data);
+        }
+      } catch (e) {
+        // Silently fail; backend might be offline
+      }
+    };
+    fetchWaStatus();
+    const interval = setInterval(fetchWaStatus, 3000);
+    return () => clearInterval(interval);
+  }, [activeTab]);
+
   useEffect(() => {
     // Add dark mode class globally to match neon-noir styles
     document.documentElement.classList.add('dark');
@@ -323,6 +346,25 @@ function App() {
   const showToast = (message: string, type: 'success' | 'error' | 'info') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 5000);
+  };
+
+  const handleSaveSettings = async (updatedSettings: Record<string, string>) => {
+    try {
+      const response = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedSettings)
+      });
+      if (response.ok) {
+        showToast('Settings saved successfully', 'success');
+        fetchData();
+      } else {
+        showToast('Failed to save settings', 'error');
+      }
+    } catch (e) {
+      console.error('Failed to save settings:', e);
+      showToast('Error connecting to backend', 'error');
+    }
   };
 
   // Onboard new instrument
@@ -2321,7 +2363,11 @@ function App() {
                       <div className="text-[10px] text-gray-500 mt-0.5">Route real-time screener signals via WhatsApp</div>
                     </div>
                     <button
-                      onClick={() => setSettings(prev => ({ ...prev, whatsapp_enabled: prev.whatsapp_enabled === 'true' ? 'false' : 'true' }))}
+                      onClick={() => {
+                        const newSettings = { ...settings, whatsapp_enabled: settings.whatsapp_enabled === 'true' ? 'false' : 'true' };
+                        setSettings(newSettings);
+                        handleSaveSettings(newSettings);
+                      }}
                       className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                         settings.whatsapp_enabled === 'true' ? 'bg-[#ff6d5a]' : 'bg-white/10'
                       }`}
@@ -2334,18 +2380,121 @@ function App() {
                     </button>
                   </div>
 
-                  {/* Recipient Input */}
-                  <div className="space-y-1.5">
-                    <label className="block text-[10px] text-gray-400 uppercase font-bold">Recipient Phone Number</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 351912345678"
-                      value={settings.whatsapp_recipient || ''}
-                      onChange={(e) => setSettings(prev => ({ ...prev, whatsapp_recipient: e.target.value }))}
-                      className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-[#ff6d5a] font-mono"
-                    />
-                    <p className="text-[9px] text-gray-500">Include country code without + or spaces (e.g. 14155552671)</p>
+                  {/* WhatsApp Connection Status */}
+                  <div className="p-3.5 bg-black/40 border border-white/5 rounded-lg space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Bot Connection Status</div>
+                      <div className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${
+                          waStatus.state === 'connected' ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]' :
+                          waStatus.state === 'awaiting_pairing' ? 'bg-amber-400 animate-pulse shadow-[0_0_6px_rgba(251,191,36,0.5)]' :
+                          waStatus.state === 'error' ? 'bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.5)]' :
+                          'bg-gray-600'
+                        }`} />
+                        <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                          waStatus.state === 'connected' ? 'text-emerald-400' :
+                          waStatus.state === 'awaiting_pairing' ? 'text-amber-400' :
+                          waStatus.state === 'error' ? 'text-rose-400' :
+                          'text-gray-500'
+                        }`}>
+                          {waStatus.state === 'connected' ? '✓ Connected' :
+                           waStatus.state === 'awaiting_pairing' ? '⏳ Awaiting Pairing' :
+                           waStatus.state === 'error' ? '✗ Error' :
+                           'Disconnected'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Pairing Code Display */}
+                    {waStatus.state === 'awaiting_pairing' && waStatus.pairing_code && (
+                      <div className="space-y-2">
+                        <div className="p-4 bg-gradient-to-br from-amber-500/5 to-orange-500/5 border border-amber-500/20 rounded-xl text-center space-y-2">
+                          <div className="text-[10px] text-amber-400/80 uppercase font-bold tracking-widest">Pairing Code</div>
+                          <div className="flex items-center justify-center gap-1">
+                            {waStatus.pairing_code.split('').map((char, i) => (
+                              <span key={i} className={`inline-block w-8 h-10 leading-10 text-center text-lg font-mono font-bold rounded-lg ${
+                                char === '-' || char === ' ' ? 'text-gray-500 w-3' : 'bg-black/60 border border-amber-500/30 text-amber-300 shadow-[0_0_10px_rgba(251,191,36,0.1)]'
+                              }`}>
+                                {char}
+                              </span>
+                            ))}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(waStatus.pairing_code);
+                              showToast('Pairing code copied!', 'success');
+                            }}
+                            className="inline-flex items-center gap-1.5 text-[10px] text-amber-400/70 hover:text-amber-300 transition-colors cursor-pointer"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            Copy Code
+                          </button>
+                        </div>
+                        <div className="text-[9px] text-gray-500 text-center leading-relaxed">
+                          Open <span className="text-white font-bold">WhatsApp → Settings → Linked Devices → Link a Device</span><br/>
+                          Then enter the code above when prompted.
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Error Message */}
+                    {waStatus.state === 'error' && waStatus.error_message && (
+                      <div className="p-3 bg-rose-500/5 border border-rose-500/20 rounded-lg">
+                        <p className="text-[10px] text-rose-400 font-mono">{waStatus.error_message}</p>
+                      </div>
+                    )}
                   </div>
+
+                  {/* Recipient status or input */}
+                  {settings.whatsapp_recipient ? (
+                    <div className="p-3.5 bg-black/40 border border-white/5 rounded-lg flex items-center justify-between">
+                      <div>
+                        <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Registered Recipient</div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                          <span className="font-mono text-xs text-white">+{settings.whatsapp_recipient}</span>
+                          <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
+                            Active
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const newSettings = { ...settings, whatsapp_enabled: 'false', whatsapp_recipient: '' };
+                          setSettings(newSettings);
+                          await handleSaveSettings(newSettings);
+                        }}
+                        className="px-2.5 py-1.5 rounded bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 hover:border-rose-500/50 text-rose-400 text-[10px] font-bold uppercase transition"
+                      >
+                        Unsubscribe
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] text-gray-400 uppercase font-bold">Recipient Phone Number</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="e.g. 351912345678"
+                          value={settings.whatsapp_recipient || ''}
+                          onChange={(e) => setSettings(prev => ({ ...prev, whatsapp_recipient: e.target.value }))}
+                          className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-[#ff6d5a] font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSaveSettings(settings)}
+                          className="px-4 py-2 rounded-lg bg-[#ff6d5a] hover:bg-[#ff8c7a] text-black text-xs font-bold transition"
+                        >
+                          Bind
+                        </button>
+                      </div>
+                      <p className="text-[9px] text-gray-500">Include country code without + or spaces (e.g. 14155552671)</p>
+                    </div>
+                  )}
 
                   {/* Test Connection Button */}
                   <div className="pt-2">
@@ -2398,45 +2547,80 @@ function App() {
                       )}
                     </button>
                   </div>
+
+                  {/* WhatsApp Tier Subscriptions */}
+                  <div className="space-y-2 pt-1">
+                    <label className="block text-[10px] text-gray-400 uppercase font-bold tracking-wider">Alert Subscriptions</label>
+                    <div className="bg-black/40 border border-white/5 rounded-lg divide-y divide-white/5">
+                      {([
+                        { key: 'wa_tier_premium', label: 'Premium', emoji: '🟢' },
+                        { key: 'wa_tier_opportunity', label: 'Opportunity', emoji: '🟡' },
+                        { key: 'wa_tier_digest', label: 'Digest', emoji: '⚪' },
+                      ] as const).map(tier => (
+                        <div key={tier.key} className="flex items-center justify-between px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs">{tier.emoji}</span>
+                            <span className="text-[11px] font-medium text-gray-300">{tier.label}</span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              const newVal = settings[tier.key] === 'true' ? 'false' : 'true';
+                              const newSettings = { ...settings, [tier.key]: newVal };
+                              setSettings(newSettings);
+                              handleSaveSettings(newSettings);
+                            }}
+                            className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                              settings[tier.key] !== 'false' ? 'bg-[#ff6d5a]' : 'bg-white/10'
+                            }`}
+                          >
+                            <span
+                              className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                settings[tier.key] !== 'false' ? 'translate-x-4' : 'translate-x-0'
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Engine System Stats & Help Card */}
-              <div className="glass border border-white/5 p-6 rounded-xl space-y-6 bg-black/20 flex flex-col justify-between">
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-[#825aff]/10 border border-[#825aff]/20 flex items-center justify-center text-lg text-[#825aff] shadow-[0_0_15px_rgba(130,90,255,0.1)]">
-                      🤖
+              {/* WhatsApp Bot Commands — collapsible */}
+              <div className="glass border border-white/5 p-4 rounded-xl bg-black/20">
+                <details className="group">
+                  <summary className="list-none flex items-center justify-between cursor-pointer select-none">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-base">💬</span>
+                      <span className="text-xs font-bold text-gray-300 uppercase tracking-wider">WhatsApp Commands</span>
                     </div>
-                    <div>
-                      <h3 className="font-bold text-sm text-white">WhatsApp Bot Commands</h3>
-                      <p className="text-[10px] text-gray-400">Control the engine remotely on WhatsApp</p>
+                    <span className="text-[10px] text-gray-500 transition-transform group-open:rotate-180">▼</span>
+                  </summary>
+                  <div className="mt-3 bg-black/30 border border-white/5 rounded-lg p-3 font-mono text-[10px]">
+                    <div className="text-[9px] text-gray-500 uppercase font-bold mb-2">Data Queries</div>
+                    <div className="space-y-1">
+                      <div className="flex justify-between"><span className="text-[#ff6d5a]">/regime</span><span className="text-gray-500">Market regime</span></div>
+                      <div className="flex justify-between"><span className="text-[#ff6d5a]">/candidates</span><span className="text-gray-500">Active setups</span></div>
+                      <div className="flex justify-between"><span className="text-[#ff6d5a]">/alerts</span><span className="text-gray-500">Recent signals</span></div>
                     </div>
-                  </div>
-
-                  <div className="bg-black/30 border border-white/5 rounded-lg p-4 space-y-2.5 font-mono text-[10px]">
-                    <div className="flex justify-between text-gray-400 border-b border-white/5 pb-1">
-                      <span>Command</span>
-                      <span>Description</span>
+                    <div className="text-[9px] text-gray-500 uppercase font-bold mt-3 mb-2">Subscriptions</div>
+                    <div className="space-y-1">
+                      <div className="flex justify-between"><span className="text-[#ff6d5a]">/set_premium</span><span className="text-gray-500">Subscribe Premium</span></div>
+                      <div className="flex justify-between"><span className="text-[#ff6d5a]">/set_opportunity</span><span className="text-gray-500">Subscribe Opportunity</span></div>
+                      <div className="flex justify-between"><span className="text-[#ff6d5a]">/set_digest</span><span className="text-gray-500">Subscribe Digest</span></div>
+                      <div className="flex justify-between"><span className="text-gray-500">/unset_*</span><span className="text-gray-500">Remove subscription</span></div>
+                      <div className="flex justify-between"><span className="text-[#ff6d5a]">/stop</span><span className="text-gray-500">Remove all</span></div>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-[#ff6d5a]">/regime</span>
-                      <span className="text-gray-400 text-right">Get current market regime</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[#ff6d5a]">/candidates</span>
-                      <span className="text-gray-400 text-right">List active swing setups</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[#ff6d5a]">/alerts</span>
-                      <span className="text-gray-400 text-right">List recent signals</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[#ff6d5a]">/act &lt;id&gt;</span>
-                      <span className="text-gray-400 text-right">Mark alert as acted-on</span>
+                    <div className="text-[9px] text-gray-500 uppercase font-bold mt-3 mb-2">System</div>
+                    <div className="space-y-1">
+                      <div className="flex justify-between"><span className="text-[#ff6d5a]">/act &lt;id&gt;</span><span className="text-gray-500">Execute trade</span></div>
+                      <div className="flex justify-between"><span className="text-[#ff6d5a]">/skip &lt;id&gt;</span><span className="text-gray-500">Dismiss alert</span></div>
+                      <div className="flex justify-between"><span className="text-[#ff6d5a]">/status</span><span className="text-gray-500">Engine status</span></div>
+                      <div className="flex justify-between"><span className="text-[#ff6d5a]">/help</span><span className="text-gray-500">Help menu</span></div>
                     </div>
                   </div>
-                </div>
+                  <p className="text-[9px] text-gray-600 mt-2">Send /start to auto-subscribe all tiers.</p>
+                </details>
               </div>
 
               {/* Telegram Bot Configuration Card */}
@@ -2459,7 +2643,11 @@ function App() {
                       <div className="text-[10px] text-gray-500 mt-0.5">Route real-time screener signals via Telegram</div>
                     </div>
                     <button
-                      onClick={() => setSettings(prev => ({ ...prev, telegram_enabled: prev.telegram_enabled === 'true' ? 'false' : 'true' }))}
+                      onClick={() => {
+                        const newSettings = { ...settings, telegram_enabled: settings.telegram_enabled === 'true' ? 'false' : 'true' };
+                        setSettings(newSettings);
+                        handleSaveSettings(newSettings);
+                      }}
                       className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                         settings.telegram_enabled === 'true' ? 'bg-[#ff6d5a]' : 'bg-white/10'
                       }`}
@@ -2493,42 +2681,89 @@ function App() {
                     </div>
                   </div>
 
-                  {/* Chat IDs */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="space-y-1">
-                      <label className="block text-[9px] text-gray-400 uppercase font-bold">Premium Chat ID</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. -100..."
-                        value={settings.tg_chat_premium || ''}
-                        onChange={(e) => setSettings(prev => ({ ...prev, tg_chat_premium: e.target.value }))}
-                        className="w-full bg-black/40 border border-white/10 rounded-lg px-2.5 py-2 text-[11px] text-white placeholder-gray-600 focus:outline-none focus:border-[#ff6d5a] font-mono"
-                      />
+                  {/* Channel Bindings — compact table */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[10px] text-gray-400 uppercase font-bold tracking-wider">Channel Bindings</label>
+                      {(settings.tg_chat_premium || settings.tg_chat_opportunity || settings.tg_chat_digest) && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const newSettings = { ...settings, tg_chat_premium: '', tg_chat_opportunity: '', tg_chat_digest: '' };
+                            setSettings(newSettings);
+                            await handleSaveSettings(newSettings);
+                          }}
+                          className="text-[9px] text-rose-400/70 hover:text-rose-400 transition cursor-pointer"
+                        >
+                          Stop all topics
+                        </button>
+                      )}
                     </div>
-                    <div className="space-y-1">
-                      <label className="block text-[9px] text-gray-400 uppercase font-bold">Opportunity Chat ID</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. -100..."
-                        value={settings.tg_chat_opportunity || ''}
-                        onChange={(e) => setSettings(prev => ({ ...prev, tg_chat_opportunity: e.target.value }))}
-                        className="w-full bg-black/40 border border-white/10 rounded-lg px-2.5 py-2 text-[11px] text-white placeholder-gray-600 focus:outline-none focus:border-[#ff6d5a] font-mono"
-                      />
+
+                    <div className="bg-black/40 border border-white/5 rounded-lg overflow-hidden divide-y divide-white/5">
+                      {/* Row: Premium */}
+                      <div className="flex items-center justify-between px-3 py-2.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${settings.tg_chat_premium ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]' : 'bg-white/10'}`} />
+                          <span className="text-[10px] font-bold text-gray-300 uppercase tracking-wider whitespace-nowrap">🟢 Premium</span>
+                          {settings.tg_chat_premium ? (
+                            <span className="font-mono text-[10px] text-gray-500 truncate ml-1" title={settings.tg_chat_premium}>ID …{settings.tg_chat_premium.slice(-6)}</span>
+                          ) : (
+                            <span className="text-[10px] text-gray-600 italic ml-1">not bound</span>
+                          )}
+                        </div>
+                        {settings.tg_chat_premium && (
+                          <button
+                            type="button"
+                            onClick={async () => { const s = { ...settings, tg_chat_premium: '' }; setSettings(s); await handleSaveSettings(s); }}
+                            className="w-5 h-5 flex items-center justify-center rounded hover:bg-rose-500/20 text-gray-500 hover:text-rose-400 transition text-xs shrink-0"
+                            title="Remove binding"
+                          >✕</button>
+                        )}
+                      </div>
+                      {/* Row: Opportunity */}
+                      <div className="flex items-center justify-between px-3 py-2.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${settings.tg_chat_opportunity ? 'bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.5)]' : 'bg-white/10'}`} />
+                          <span className="text-[10px] font-bold text-gray-300 uppercase tracking-wider whitespace-nowrap">🟡 Opportunity</span>
+                          {settings.tg_chat_opportunity ? (
+                            <span className="font-mono text-[10px] text-gray-500 truncate ml-1" title={settings.tg_chat_opportunity}>ID …{settings.tg_chat_opportunity.slice(-6)}</span>
+                          ) : (
+                            <span className="text-[10px] text-gray-600 italic ml-1">not bound</span>
+                          )}
+                        </div>
+                        {settings.tg_chat_opportunity && (
+                          <button
+                            type="button"
+                            onClick={async () => { const s = { ...settings, tg_chat_opportunity: '' }; setSettings(s); await handleSaveSettings(s); }}
+                            className="w-5 h-5 flex items-center justify-center rounded hover:bg-rose-500/20 text-gray-500 hover:text-rose-400 transition text-xs shrink-0"
+                            title="Remove binding"
+                          >✕</button>
+                        )}
+                      </div>
+                      {/* Row: Digest */}
+                      <div className="flex items-center justify-between px-3 py-2.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${settings.tg_chat_digest ? 'bg-white/40 shadow-[0_0_6px_rgba(255,255,255,0.15)]' : 'bg-white/10'}`} />
+                          <span className="text-[10px] font-bold text-gray-300 uppercase tracking-wider whitespace-nowrap">⚪ Digest</span>
+                          {settings.tg_chat_digest ? (
+                            <span className="font-mono text-[10px] text-gray-500 truncate ml-1" title={settings.tg_chat_digest}>ID …{settings.tg_chat_digest.slice(-6)}</span>
+                          ) : (
+                            <span className="text-[10px] text-gray-600 italic ml-1">not bound</span>
+                          )}
+                        </div>
+                        {settings.tg_chat_digest && (
+                          <button
+                            type="button"
+                            onClick={async () => { const s = { ...settings, tg_chat_digest: '' }; setSettings(s); await handleSaveSettings(s); }}
+                            className="w-5 h-5 flex items-center justify-center rounded hover:bg-rose-500/20 text-gray-500 hover:text-rose-400 transition text-xs shrink-0"
+                            title="Remove binding"
+                          >✕</button>
+                        )}
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <label className="block text-[9px] text-gray-400 uppercase font-bold">Digest Chat ID</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. -100..."
-                        value={settings.tg_chat_digest || ''}
-                        onChange={(e) => setSettings(prev => ({ ...prev, tg_chat_digest: e.target.value }))}
-                        className="w-full bg-black/40 border border-white/10 rounded-lg px-2.5 py-2 text-[11px] text-white placeholder-gray-600 focus:outline-none focus:border-[#ff6d5a] font-mono"
-                      />
-                    </div>
+                    <p className="text-[9px] text-gray-600">Send <code className="text-gray-400">/set_premium</code>, <code className="text-gray-400">/set_opportunity</code>, or <code className="text-gray-400">/set_digest</code> in Telegram to bind a chat.</p>
                   </div>
-                  <p className="text-[9px] text-gray-500">
-                    Use Telegram commands in your chat (e.g. <code>/set_premium</code>) to bind automatically, or enter the ID manually.
-                  </p>
 
                   {/* Test Connection Button */}
                   <div className="pt-2">
@@ -2591,50 +2826,97 @@ function App() {
                 </div>
               </div>
 
-              {/* Telegram Bot Commands Card */}
-              <div className="glass border border-white/5 p-6 rounded-xl space-y-6 bg-black/20 flex flex-col justify-between">
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-lg text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.1)]">
-                      🤖
+              {/* Telegram Bot Commands — collapsible */}
+              <div className="glass border border-white/5 p-4 rounded-xl bg-black/20">
+                <details className="group">
+                  <summary className="list-none flex items-center justify-between cursor-pointer select-none">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-base">✈️</span>
+                      <span className="text-xs font-bold text-gray-300 uppercase tracking-wider">Telegram Commands</span>
                     </div>
-                    <div>
-                      <h3 className="font-bold text-sm text-white">Telegram Bot Commands</h3>
-                      <p className="text-[10px] text-gray-400">Control the engine remotely on Telegram</p>
+                    <span className="text-[10px] text-gray-500 transition-transform group-open:rotate-180">▼</span>
+                  </summary>
+                  <div className="mt-3 bg-black/30 border border-white/5 rounded-lg p-3 font-mono text-[10px]">
+                    <div className="text-[9px] text-gray-500 uppercase font-bold mb-2">Data Queries</div>
+                    <div className="space-y-1">
+                      <div className="flex justify-between"><span className="text-[#ff6d5a]">/regime</span><span className="text-gray-500">Market regime</span></div>
+                      <div className="flex justify-between"><span className="text-[#ff6d5a]">/candidates</span><span className="text-gray-500">Active setups</span></div>
+                      <div className="flex justify-between"><span className="text-[#ff6d5a]">/alerts</span><span className="text-gray-500">Recent signals</span></div>
                     </div>
-                  </div>
-
-                  <div className="bg-black/30 border border-white/5 rounded-lg p-4 space-y-2 font-mono text-[10px]">
-                    <div className="flex justify-between text-gray-400 border-b border-white/5 pb-1">
-                      <span>Command</span>
-                      <span>Description</span>
+                    <div className="text-[9px] text-gray-500 uppercase font-bold mt-3 mb-2">Subscriptions</div>
+                    <div className="space-y-1">
+                      <div className="flex justify-between"><span className="text-[#ff6d5a]">/set_premium</span><span className="text-gray-500">Bind Premium</span></div>
+                      <div className="flex justify-between"><span className="text-[#ff6d5a]">/set_opportunity</span><span className="text-gray-500">Bind Opportunity</span></div>
+                      <div className="flex justify-between"><span className="text-[#ff6d5a]">/set_digest</span><span className="text-gray-500">Bind Digest</span></div>
+                      <div className="flex justify-between"><span className="text-gray-500">/unset_*</span><span className="text-gray-500">Remove binding</span></div>
+                      <div className="flex justify-between"><span className="text-[#ff6d5a]">/stop</span><span className="text-gray-500">Remove all</span></div>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-[#ff6d5a]">/set_premium</span>
-                      <span className="text-gray-400 text-right">Register chat for Premium alerts</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[#ff6d5a]">/set_opportunity</span>
-                      <span className="text-gray-400 text-right">Register chat for Opportunity alerts</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[#ff6d5a]">/set_digest</span>
-                      <span className="text-gray-400 text-right">Register chat for Digest alerts</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[#ff6d5a]">/status</span>
-                      <span className="text-gray-400 text-right">Show engine status & stats</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[#ff6d5a]">/help</span>
-                      <span className="text-gray-400 text-right">Show help menu</span>
+                    <div className="text-[9px] text-gray-500 uppercase font-bold mt-3 mb-2">System</div>
+                    <div className="space-y-1">
+                      <div className="flex justify-between"><span className="text-[#ff6d5a]">/status</span><span className="text-gray-500">Engine status</span></div>
+                      <div className="flex justify-between"><span className="text-[#ff6d5a]">/help</span><span className="text-gray-500">Help menu</span></div>
                     </div>
                   </div>
-                  <p className="text-[9px] text-gray-500">
-                    Supports inline buttons in messages for instant responses (e.g. taking trades on Saxo).
-                  </p>
-                </div>
+                  <p className="text-[9px] text-gray-600 mt-2">Send /start to auto-register all tiers. Supports inline buttons for trade actions.</p>
+                </details>
               </div>
+            </div>
+
+            {/* Collapsible Advanced Settings Overrides Card */}
+            <div className="glass border border-white/5 p-6 rounded-xl space-y-4 bg-black/20">
+              <details className="group">
+                <summary className="list-none flex items-center justify-between cursor-pointer text-xs text-gray-400 uppercase tracking-wider font-bold hover:text-white transition select-none">
+                  <span>Advanced Settings & Manual Overrides</span>
+                  <span className="transition-transform group-open:rotate-180">▼</span>
+                </summary>
+                <div className="mt-5 space-y-4">
+                  <p className="text-[10px] text-gray-500">
+                    Manually enter or override chat IDs and recipient numbers without using Telegram commands.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="block text-[9px] text-gray-400 uppercase font-bold">Premium Chat ID</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. -100..."
+                        value={settings.tg_chat_premium || ''}
+                        onChange={(e) => setSettings(prev => ({ ...prev, tg_chat_premium: e.target.value }))}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#ff6d5a] font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="block text-[9px] text-gray-400 uppercase font-bold">Opportunity Chat ID</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. -100..."
+                        value={settings.tg_chat_opportunity || ''}
+                        onChange={(e) => setSettings(prev => ({ ...prev, tg_chat_opportunity: e.target.value }))}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#ff6d5a] font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="block text-[9px] text-gray-400 uppercase font-bold">Digest Chat ID</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. -100..."
+                        value={settings.tg_chat_digest || ''}
+                        onChange={(e) => setSettings(prev => ({ ...prev, tg_chat_digest: e.target.value }))}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#ff6d5a] font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="block text-[9px] text-gray-400 uppercase font-bold">WhatsApp Recipient</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 14155552671"
+                        value={settings.whatsapp_recipient || ''}
+                        onChange={(e) => setSettings(prev => ({ ...prev, whatsapp_recipient: e.target.value }))}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#ff6d5a] font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </details>
             </div>
 
             {/* Global Settings Actions */}
@@ -2643,24 +2925,7 @@ function App() {
                 Saving updates notifications configurations in the SQLite persistence settings table.
               </div>
               <button
-                onClick={async () => {
-                  try {
-                    const response = await fetch('/api/settings', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify(settings)
-                    });
-                    if (response.ok) {
-                      showToast('Settings saved successfully', 'success');
-                      fetchData();
-                    } else {
-                      showToast('Failed to save settings', 'error');
-                    }
-                  } catch (e) {
-                    console.error('Failed to save settings:', e);
-                    showToast('Error connecting to backend', 'error');
-                  }
-                }}
+                onClick={() => handleSaveSettings(settings)}
                 className="bg-[#ff6d5a] hover:bg-[#ff8c7a] text-black text-xs font-bold rounded-lg px-6 py-2.5 transition shadow-[0_0_15px_rgba(255,109,90,0.2)]"
               >
                 Save Configuration

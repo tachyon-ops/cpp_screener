@@ -257,6 +257,87 @@ void TelegramBot::handle_text_command(const std::string& chat_id, const std::str
         store_->set_setting("tg_chat_digest", chat_id);
         reload_chat_ids();
         send_message(chat_id, "<b>[System]</b> This chat has been successfully registered for ⚪ <b>DIGEST/INTERESTING</b> alerts.");
+    } else if (text == "/unset_premium") {
+        store_->set_setting("tg_chat_premium", "");
+        reload_chat_ids();
+        send_message(chat_id, "<b>[System]</b> 🟢 <b>PREMIUM</b> alerts have been unbound from this chat.");
+    } else if (text == "/unset_opportunity") {
+        store_->set_setting("tg_chat_opportunity", "");
+        reload_chat_ids();
+        send_message(chat_id, "<b>[System]</b> 🟡 <b>OPPORTUNITY</b> alerts have been unbound from this chat.");
+    } else if (text == "/unset_digest") {
+        store_->set_setting("tg_chat_digest", "");
+        reload_chat_ids();
+        send_message(chat_id, "<b>[System]</b> ⚪ <b>DIGEST</b> alerts have been unbound from this chat.");
+    } else if (text == "/stop" || text == "/unsubscribe") {
+        store_->set_setting("tg_chat_premium", "");
+        store_->set_setting("tg_chat_opportunity", "");
+        store_->set_setting("tg_chat_digest", "");
+        store_->set_setting("telegram_enabled", "false");
+        reload_chat_ids();
+        send_message(chat_id, "❌ <b>Telegram Notifications Disabled</b>\n\nAll alert bindings have been removed and notifications are turned off.\nSend /start to re-enable.");
+    } else if (text == "/regime") {
+        auto logs = store_->get_regime_log(1);
+        if (logs.empty()) {
+            send_message(chat_id, "📊 No regime data available yet.");
+        } else {
+            auto& r = logs[0];
+            std::stringstream ss;
+            ss << "📊 <b>Current Market Regime</b>\n\n"
+               << "Regime: <b>" << r.regime << "</b>\n"
+               << "VIX: " << std::fixed << std::setprecision(2) << r.vix << "\n"
+               << "Breadth: " << std::setprecision(3) << r.breadth << "\n"
+               << "HY OAS: " << std::setprecision(2) << r.hy_oas << "\n"
+               << "SPX vs 200MA: " << std::setprecision(2) << r.spx_vs_200ma << "\n"
+               << "As of: <code>" << r.ts << "</code>";
+            send_message(chat_id, ss.str());
+        }
+    } else if (text == "/candidates") {
+        auto candidates = store_->get_candidates();
+        std::vector<persistence::DbCandidate> active;
+        for (const auto& c : candidates) {
+            if (c.status == "active") active.push_back(c);
+        }
+        if (active.empty()) {
+            send_message(chat_id, "🎯 No active swing setups in watchlist.");
+        } else {
+            std::stringstream ss;
+            ss << "🎯 <b>Active Swing Watchlist (" << active.size() << ")</b>\n";
+            for (const auto& c : active) {
+                // Look up symbol by instrument_id
+                std::string sym = "ID:" + std::to_string(c.instrument_id);
+                auto instruments = store_->get_instruments();
+                for (const auto& i : instruments) {
+                    if (i.id == c.instrument_id) { sym = i.symbol; break; }
+                }
+                ss << "\n• <b>" << sym << "</b> (Screen " << c.screen << ")\n"
+                   << "  Entry: $" << std::fixed << std::setprecision(2) << c.entry_zone_low << " – $" << c.entry_zone_high << "\n"
+                   << "  Stop: $" << c.suggested_stop << " | R:R: " << std::setprecision(1) << c.rr_target << "\n";
+                if (!c.notes.empty()) {
+                    ss << "  Notes: " << c.notes << "\n";
+                }
+            }
+            send_message(chat_id, ss.str());
+        }
+    } else if (text == "/alerts") {
+        auto alerts = store_->get_alerts(5);
+        if (alerts.empty()) {
+            send_message(chat_id, "🚨 No screener alerts recorded.");
+        } else {
+            std::stringstream ss;
+            ss << "🚨 <b>Recent Screener Alerts (Top 5)</b>\n";
+            for (const auto& a : alerts) {
+                std::string sym = "Unknown";
+                try {
+                    auto payload = nlohmann::json::parse(a.payload_json);
+                    sym = payload.value("symbol", "Unknown");
+                } catch (...) {}
+                ss << "\n• <b>ID " << a.id << "</b> — " << sym << " (<code>" << a.ts << "</code>)\n"
+                   << "  Screen " << a.screen << " | Regime: " << a.regime_at_alert
+                   << " | Acted: " << (a.acted_on ? "Yes" : "No") << "\n";
+            }
+            send_message(chat_id, ss.str());
+        }
     } else if (text == "/status") {
         std::stringstream ss;
         ss << "<b>[Tachyon Status]</b>\n"
@@ -266,17 +347,55 @@ void TelegramBot::handle_text_command(const std::string& chat_id, const std::str
            << "Active Positions: " << store_->get_positions().size() << "\n"
            << "Active Candidates: " << store_->get_candidates().size();
         send_message(chat_id, ss.str());
-    } else if (text == "/help" || text == "/start") {
+    } else if (text == "/start") {
+        // Auto-register this chat for all three tiers on /start
+        store_->set_setting("tg_chat_premium", chat_id);
+        store_->set_setting("tg_chat_opportunity", chat_id);
+        store_->set_setting("tg_chat_digest", chat_id);
+        store_->set_setting("telegram_enabled", "true");
+        reload_chat_ids();
+
         std::stringstream ss;
-        ss << "<b>Available Commands:</b>\n"
-           << "<code>/set_premium</code> - Set this chat for Premium alerts\n"
-           << "<code>/set_opportunity</code> - Set this chat for Opportunity alerts\n"
-           << "<code>/set_digest</code> - Set this chat for Digest alerts\n"
-           << "<code>/status</code> - Show screener engine status\n"
-           << "<code>/help</code> - Show this help menu";
+        ss << "⚡ <b>Tachyon Trading Screener</b> ⚡\n\n"
+           << "✅ <b>Registration complete!</b>\n"
+           << "This chat is now bound to all alert tiers:\n"
+           << "  🟢 Premium  •  🟡 Opportunity  •  ⚪ Digest\n\n"
+           << "<b>Available Commands:</b>\n"
+           << "<code>/regime</code> — Current market regime\n"
+           << "<code>/candidates</code> — List active swing setups\n"
+           << "<code>/alerts</code> — List recent signals\n"
+           << "<code>/set_premium</code> — Bind Premium alerts to a chat\n"
+           << "<code>/set_opportunity</code> — Bind Opportunity alerts\n"
+           << "<code>/set_digest</code> — Bind Digest alerts\n"
+           << "<code>/unset_premium</code> — Remove Premium binding\n"
+           << "<code>/unset_opportunity</code> — Remove Opportunity binding\n"
+           << "<code>/unset_digest</code> — Remove Digest binding\n"
+           << "<code>/stop</code> — Unsubscribe from all alerts\n"
+           << "<code>/status</code> — Show engine status\n"
+           << "<code>/help</code> — Show this help menu";
+        send_message(chat_id, ss.str());
+    } else if (text == "/help") {
+        std::stringstream ss;
+        ss << "🤖 <b>Tachyon Screener Bot Commands</b> 🤖\n\n"
+           << "<b>Data Queries:</b>\n"
+           << "<code>/regime</code> — Current market regime\n"
+           << "<code>/candidates</code> — List active swing setups\n"
+           << "<code>/alerts</code> — List recent signals\n\n"
+           << "<b>Subscriptions:</b>\n"
+           << "<code>/set_premium</code> — Bind Premium alerts\n"
+           << "<code>/set_opportunity</code> — Bind Opportunity alerts\n"
+           << "<code>/set_digest</code> — Bind Digest alerts\n"
+           << "<code>/unset_premium</code> — Remove Premium binding\n"
+           << "<code>/unset_opportunity</code> — Remove Opportunity binding\n"
+           << "<code>/unset_digest</code> — Remove Digest binding\n"
+           << "<code>/stop</code> — Unsubscribe from all alerts\n\n"
+           << "<b>System:</b>\n"
+           << "<code>/status</code> — Show engine status & stats\n"
+           << "<code>/help</code> — Show this help menu";
         send_message(chat_id, ss.str());
     }
 }
+
 
 void TelegramBot::handle_callback_query(const nlohmann::json& callback) {
     std::string callback_id = callback["id"];
@@ -417,22 +536,18 @@ void TelegramBot::handle_callback_query(const nlohmann::json& callback) {
         new_markup = "";
     } 
     else if (action == "skip") {
-        nlohmann::json skip_keyboard = {
-            {"inline_keyboard", {
-                {
-                    {{"text", "Wrong Regime"}, {"callback_data", "skip_reason:Wrong Regime:" + std::to_string(alert_id)}},
-                    {{"text", "Bad News"}, {"callback_data", "skip_reason:Bad News:" + std::to_string(alert_id)}}
-                },
-                {
-                    {{"text", "Size Too Large"}, {"callback_data", "skip_reason:Size Too Large:" + std::to_string(alert_id)}},
-                    {{"text", "Correlated Pos"}, {"callback_data", "skip_reason:Correlated Pos:" + std::to_string(alert_id)}}
-                },
-                {
-                    {{"text", "Don't Trust"}, {"callback_data", "skip_reason:Don't Trust:" + std::to_string(alert_id)}},
-                    {{"text", "Other"}, {"callback_data", "skip_reason:Other:" + std::to_string(alert_id)}}
-                }
-            }}
-        };
+        nlohmann::json btn_regime = nlohmann::json::object({{"text", "Wrong Regime"}, {"callback_data", "skip_reason:Wrong Regime:" + std::to_string(alert_id)}});
+        nlohmann::json btn_news   = nlohmann::json::object({{"text", "Bad News"}, {"callback_data", "skip_reason:Bad News:" + std::to_string(alert_id)}});
+        nlohmann::json btn_size   = nlohmann::json::object({{"text", "Size Too Large"}, {"callback_data", "skip_reason:Size Too Large:" + std::to_string(alert_id)}});
+        nlohmann::json btn_corr   = nlohmann::json::object({{"text", "Correlated Pos"}, {"callback_data", "skip_reason:Correlated Pos:" + std::to_string(alert_id)}});
+        nlohmann::json btn_trust  = nlohmann::json::object({{"text", "Don't Trust"}, {"callback_data", "skip_reason:Don't Trust:" + std::to_string(alert_id)}});
+        nlohmann::json btn_other  = nlohmann::json::object({{"text", "Other"}, {"callback_data", "skip_reason:Other:" + std::to_string(alert_id)}});
+        nlohmann::json skip_keyboard;
+        skip_keyboard["inline_keyboard"] = nlohmann::json::array({
+            nlohmann::json::array({btn_regime, btn_news}),
+            nlohmann::json::array({btn_size, btn_corr}),
+            nlohmann::json::array({btn_trust, btn_other})
+        });
         edit_message_reply_markup(chat_id, message_id, skip_keyboard.dump());
         answer_callback_query(callback_id, "Select skip reason");
         edit_needed = false;

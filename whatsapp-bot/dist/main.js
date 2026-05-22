@@ -45,21 +45,194 @@ async function isAuthorized(from) {
         return false;
     }
 }
+// Unified help text (shared between /help and /start)
+const HELP_TEXT = [
+    '🤖 *Tachyon Screener Bot Commands* 🤖',
+    '',
+    '*Data Queries:*',
+    '• `/regime` — Current market regime',
+    '• `/candidates` — List active swing setups',
+    '• `/alerts` — List recent signals',
+    '',
+    '*Subscriptions:*',
+    '• `/set_premium` — Subscribe to Premium alerts',
+    '• `/set_opportunity` — Subscribe to Opportunity alerts',
+    '• `/set_digest` — Subscribe to Digest alerts',
+    '• `/unset_premium` — Remove Premium subscription',
+    '• `/unset_opportunity` — Remove Opportunity subscription',
+    '• `/unset_digest` — Remove Digest subscription',
+    '• `/stop` — Unsubscribe from all alerts',
+    '',
+    '*System:*',
+    '• `/status` — Show engine status & stats',
+    '• `/act <id>` — Execute trade for alert',
+    '• `/skip <id>` — Dismiss alert',
+    '• `/help` — Show this help menu'
+].join('\n');
 // Bot flows
 const helpFlow = addKeyword(['/help', 'help', 'menu'])
     .addAction(async (ctx, { flowDynamic }) => {
     if (!(await isAuthorized(ctx.from)))
         return;
+    await flowDynamic(HELP_TEXT);
+});
+const startFlow = addKeyword(['/start'])
+    .addAction(async (ctx, { flowDynamic }) => {
+    // /start auto-subscribes all tiers (same as Telegram)
+    try {
+        await fetch(`${BACKEND_URL}/api/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                whatsapp_enabled: 'true',
+                whatsapp_recipient: ctx.from,
+                wa_tier_premium: 'true',
+                wa_tier_opportunity: 'true',
+                wa_tier_digest: 'true'
+            })
+        });
+    }
+    catch (e) { }
     await flowDynamic([
-        '🤖 *Tachyon Screener Bot Commands* 🤖',
+        '⚡ *Tachyon Trading Screener* ⚡',
         '',
-        '• `/regime` : Current market regime',
-        '• `/candidates` : List active swing setups',
-        '• `/alerts` : List recent screener signals',
-        '• `/act <id>` : Mark alert as acted-on / execute trade',
-        '• `/skip <id>` : Mark alert as skipped / dismiss',
-        '• `/help` : Show this help message'
+        '✅ *Registration complete!*',
+        'This number is now subscribed to all alert tiers:',
+        '  🟢 Premium  •  🟡 Opportunity  •  ⚪ Digest',
+        '',
+        HELP_TEXT
     ].join('\n'));
+});
+const statusFlow = addKeyword(['/status'])
+    .addAction(async (ctx, { flowDynamic }) => {
+    if (!(await isAuthorized(ctx.from)))
+        return;
+    try {
+        const [settingsRes, regimeRes, candidatesRes, positionsRes] = await Promise.all([
+            fetch(`${BACKEND_URL}/api/settings`),
+            fetch(`${BACKEND_URL}/api/regime`),
+            fetch(`${BACKEND_URL}/api/candidates`),
+            fetch(`${BACKEND_URL}/api/positions`)
+        ]);
+        const settings = settingsRes.ok ? await settingsRes.json() : {};
+        const regime = regimeRes.ok ? await regimeRes.json() : [];
+        const candidates = candidatesRes.ok ? (await candidatesRes.json()).filter((c) => c.status === 'active') : [];
+        const positions = positionsRes.ok ? await positionsRes.json() : [];
+        const lines = [
+            '📊 *Tachyon Status*',
+            '',
+            `Regime: *${regime[0]?.regime?.toUpperCase() || 'Unknown'}*`,
+            `Active Candidates: ${candidates.length}`,
+            `Open Positions: ${positions.length}`,
+            '',
+            '*WhatsApp Subscriptions:*',
+            `  🟢 Premium: ${settings.wa_tier_premium === 'true' ? '✅' : '❌'}`,
+            `  🟡 Opportunity: ${settings.wa_tier_opportunity === 'true' ? '✅' : '❌'}`,
+            `  ⚪ Digest: ${settings.wa_tier_digest === 'true' ? '✅' : '❌'}`
+        ];
+        await flowDynamic(lines.join('\n'));
+    }
+    catch (e) {
+        await flowDynamic(`❌ Error: ${e.message}`);
+    }
+});
+// Topic subscription flows (mirrors Telegram's /set_premium, /set_opportunity, /set_digest)
+const setPremiumFlow = addKeyword(['/set_premium'])
+    .addAction(async (ctx, { flowDynamic }) => {
+    if (!(await isAuthorized(ctx.from)))
+        return;
+    try {
+        await fetch(`${BACKEND_URL}/api/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wa_tier_premium: 'true' })
+        });
+        await flowDynamic('✅ Subscribed to 🟢 *PREMIUM* alerts.');
+    }
+    catch (e) {
+        await flowDynamic(`❌ Error: ${e.message}`);
+    }
+});
+const setOpportunityFlow = addKeyword(['/set_opportunity'])
+    .addAction(async (ctx, { flowDynamic }) => {
+    if (!(await isAuthorized(ctx.from)))
+        return;
+    try {
+        await fetch(`${BACKEND_URL}/api/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wa_tier_opportunity: 'true' })
+        });
+        await flowDynamic('✅ Subscribed to 🟡 *OPPORTUNITY* alerts.');
+    }
+    catch (e) {
+        await flowDynamic(`❌ Error: ${e.message}`);
+    }
+});
+const setDigestFlow = addKeyword(['/set_digest'])
+    .addAction(async (ctx, { flowDynamic }) => {
+    if (!(await isAuthorized(ctx.from)))
+        return;
+    try {
+        await fetch(`${BACKEND_URL}/api/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wa_tier_digest: 'true' })
+        });
+        await flowDynamic('✅ Subscribed to ⚪ *DIGEST* alerts.');
+    }
+    catch (e) {
+        await flowDynamic(`❌ Error: ${e.message}`);
+    }
+});
+// Topic unsubscription flows (mirrors Telegram's /unset_premium, /unset_opportunity, /unset_digest)
+const unsetPremiumFlow = addKeyword(['/unset_premium'])
+    .addAction(async (ctx, { flowDynamic }) => {
+    if (!(await isAuthorized(ctx.from)))
+        return;
+    try {
+        await fetch(`${BACKEND_URL}/api/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wa_tier_premium: 'false' })
+        });
+        await flowDynamic('🟢 *PREMIUM* alerts have been unsubscribed.');
+    }
+    catch (e) {
+        await flowDynamic(`❌ Error: ${e.message}`);
+    }
+});
+const unsetOpportunityFlow = addKeyword(['/unset_opportunity'])
+    .addAction(async (ctx, { flowDynamic }) => {
+    if (!(await isAuthorized(ctx.from)))
+        return;
+    try {
+        await fetch(`${BACKEND_URL}/api/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wa_tier_opportunity: 'false' })
+        });
+        await flowDynamic('🟡 *OPPORTUNITY* alerts have been unsubscribed.');
+    }
+    catch (e) {
+        await flowDynamic(`❌ Error: ${e.message}`);
+    }
+});
+const unsetDigestFlow = addKeyword(['/unset_digest'])
+    .addAction(async (ctx, { flowDynamic }) => {
+    if (!(await isAuthorized(ctx.from)))
+        return;
+    try {
+        await fetch(`${BACKEND_URL}/api/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wa_tier_digest: 'false' })
+        });
+        await flowDynamic('⚪ *DIGEST* alerts have been unsubscribed.');
+    }
+    catch (e) {
+        await flowDynamic(`❌ Error: ${e.message}`);
+    }
 });
 const regimeFlow = addKeyword(['/regime'])
     .addAction(async (ctx, { flowDynamic }) => {
@@ -223,6 +396,33 @@ const skipFlow = addKeyword('/^\\\\/skip\\\\s+(\\\\d+)$/', { regex: true })
         await flowDynamic(`Failed to dismiss alert response: ${e.message}`);
     }
 });
+const unsubscribeFlow = addKeyword(['/stop', '/unsubscribe', 'unsubscribe'])
+    .addAction(async (ctx, { flowDynamic }) => {
+    if (!(await isAuthorized(ctx.from)))
+        return;
+    try {
+        const res = await fetch(`${BACKEND_URL}/api/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                whatsapp_enabled: 'false',
+                whatsapp_recipient: '',
+                wa_tier_premium: 'false',
+                wa_tier_opportunity: 'false',
+                wa_tier_digest: 'false'
+            })
+        });
+        if (res.ok) {
+            await flowDynamic('❌ *WhatsApp Notifications Disabled*\n\nAll alert subscriptions have been removed and notifications are turned off.\nSend /start to re-enable.');
+        }
+        else {
+            await flowDynamic('❌ *Error*: Failed to disable notifications in system settings.');
+        }
+    }
+    catch (e) {
+        await flowDynamic(`❌ *Error*: Failed to query engine: ${e.message}`);
+    }
+});
 // Programmatic message dispatch helper
 async function sendWhatsAppMessage(botInstance, provider, jid, text) {
     try {
@@ -270,6 +470,18 @@ function connectWebSocket(botInstance, provider) {
                 const settings = await res.json();
                 if (settings.whatsapp_enabled !== 'true') {
                     console.log(`[WS] Alert bypassed: WhatsApp is disabled in UI`);
+                    return;
+                }
+                // Check tier-level subscription (mirrors Telegram's per-tier routing)
+                const tierMap = {
+                    'premium': 'wa_tier_premium',
+                    'opportunity': 'wa_tier_opportunity',
+                    'interesting': 'wa_tier_digest',
+                    'digest': 'wa_tier_digest'
+                };
+                const tierKey = tierMap[alert.tier] || '';
+                if (tierKey && settings[tierKey] === 'false') {
+                    console.log(`[WS] Alert bypassed: tier '${alert.tier}' is unsubscribed (${tierKey}=${settings[tierKey]})`);
                     return;
                 }
                 const recipient = settings.whatsapp_recipient || '';
@@ -324,6 +536,30 @@ function connectWebSocket(botInstance, provider) {
         console.error(`[WS] WebSocket error:`, err.message);
     });
 }
+// Report WhatsApp bot status to C++ backend
+async function reportStatus(state, pairingCode, errorMessage) {
+    try {
+        const body = { state };
+        if (pairingCode)
+            body.pairing_code = pairingCode;
+        if (errorMessage)
+            body.error_message = errorMessage;
+        const res = await fetch(`${BACKEND_URL}/api/whatsapp_status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+            console.error(`[Status] Failed to report status '${state}': ${res.statusText}`);
+        }
+        else {
+            console.log(`[Status] Reported status: ${state}${pairingCode ? ` (code: ${pairingCode})` : ''}`);
+        }
+    }
+    catch (e) {
+        console.error(`[Status] Error reporting status '${state}':`, e.message);
+    }
+}
 // Main execution block
 const main = async () => {
     let version = [2, 3000, 1035194821];
@@ -361,7 +597,13 @@ const main = async () => {
     else {
         console.log(`[Bot] QR code scan mode configured (no pairing phone number available).`);
     }
-    const adapterFlow = createFlow([helpFlow, regimeFlow, candidatesFlow, alertsFlow, actFlow, skipFlow]);
+    const adapterFlow = createFlow([
+        startFlow, helpFlow, statusFlow,
+        regimeFlow, candidatesFlow, alertsFlow, actFlow, skipFlow,
+        setPremiumFlow, setOpportunityFlow, setDigestFlow,
+        unsetPremiumFlow, unsetOpportunityFlow, unsetDigestFlow,
+        unsubscribeFlow
+    ]);
     const adapterProvider = createProvider(BaileysProvider, providerOptions);
     const adapterDB = new MemoryDB();
     console.log('[Bot] Starting BuilderBot service...');
@@ -369,6 +611,23 @@ const main = async () => {
         flow: adapterFlow,
         provider: adapterProvider,
         database: adapterDB,
+    });
+    // Listen for Baileys provider events and report status to C++ backend
+    adapterProvider.on('require_action', (payload) => {
+        const code = payload?.payload?.code || '';
+        if (code) {
+            console.log(`[Status] Pairing code received: ${code}`);
+            reportStatus('awaiting_pairing', code);
+        }
+    });
+    adapterProvider.on('ready', () => {
+        console.log(`[Status] WhatsApp provider connected.`);
+        reportStatus('connected');
+    });
+    adapterProvider.on('auth_failure', (payload) => {
+        const msg = Array.isArray(payload) ? payload.join('; ') : String(payload);
+        console.error(`[Status] WhatsApp auth failure: ${msg}`);
+        reportStatus('error', undefined, msg);
     });
     // Start listening to live WebSocket alerts
     connectWebSocket(bot, adapterProvider);

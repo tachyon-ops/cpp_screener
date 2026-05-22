@@ -178,3 +178,19 @@ Error: Connection Closed
 [2026-05-22T00:40:21.238Z] Connection update: undefined
 [2026-05-22T00:51:49.320Z] Connection update: undefined
 [2026-05-22T00:52:29.323Z] Connection update: undefined
+[2026-05-22T00:53:09.326Z] Connection update: undefined
+[2026-05-22T00:53:49.328Z] Connection update: undefined
+[2026-05-22T00:54:29.329Z] Connection update: undefined
+[2026-05-22T00:54:40.260Z] Connection update: close
+[2026-05-22T00:54:40.260Z] Connection closed. Status: 428, Reason: Connection Terminated by Server
+[2026-05-22T00:54:40.260Z] Reconnection attempt 1/10 in 1000ms
+[2026-05-22T00:55:21.715Z] Connection update: undefined
+[2026-05-22T00:56:01.717Z] Connection update: undefined
+[2026-05-22T00:56:41.718Z] Connection update: undefined
+[2026-05-22T00:56:47.478Z] Iniciando limpieza de recursos...
+[2026-05-22T01:05:03.120Z] Connection update: connecting
+[2026-05-22T01:05:04.423Z] Connection update: undefined
+[2026-05-22T01:05:04.481Z] Connection update: undefined
+[2026-05-22T01:05:04.481Z] Connection update: open
+[2026-05-22T01:05:04.481Z] Connection opened successfully
+[2026-05-22T01:09:46.725Z] Iniciando limpieza de recursos...

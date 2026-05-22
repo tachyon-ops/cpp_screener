@@ -1,0 +1,17 @@
+# Session data (Baileys WhatsApp encryption keys, device identity, signal protocol state)
+bot_sessions/
+
+# BuilderBot log files
+core.class.log
+queue.class.log
+baileys.log
+bot.qr.png
+
+# Compiled output
+dist/
+
+# Node
+node_modules/
+
+# Secrets
+secrets.env
