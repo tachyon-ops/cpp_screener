@@ -191,7 +191,9 @@ void AlertDispatcher::dispatch(const Alert& alert) {
 }
 
 void AlertDispatcher::dispatch_telegram_message(const std::string& message) {
-    if (tg_bot_) {
+    auto enabled_val = store_->get_setting("telegram_enabled");
+    bool telegram_enabled = !enabled_val || (*enabled_val == "true");
+    if (telegram_enabled && tg_bot_) {
         std::string chat_id = tg_bot_->get_chat_id("premium");
         if (!chat_id.empty()) {
             tg_bot_->send_message(chat_id, message);
@@ -569,8 +571,8 @@ void AlertDispatcher::process_queued_alerts(std::vector<Alert>& alerts) {
             nlohmann::json inline_kb = {
                 {"inline_keyboard", {
                     {
-                        {{"text", "Lead with " + leader.symbol, "callback_data", "acting:" + std::to_string(leader_id)}},
-                        {{"text", "Skip Cluster", "callback_data", "skip:" + std::to_string(leader_id)}}
+                        {{"text", "Lead with " + leader.symbol}, {"callback_data", "acting:" + std::to_string(leader_id)}},
+                        {{"text", "Skip Cluster"}, {"callback_data", "skip:" + std::to_string(leader_id)}}
                     }
                 }}
             };
@@ -700,13 +702,13 @@ void AlertDispatcher::process_queued_alerts(std::vector<Alert>& alerts) {
         nlohmann::json markup = {
             {"inline_keyboard", {
                 {
-                    {{"text", "👀 Saw it", "callback_data", "saw_it:" + std::to_string(db_id)}},
-                    {{"text", "⚡ Acting", "callback_data", "acting:" + std::to_string(db_id)}}
+                    {{"text", "👀 Saw it"}, {"callback_data", "saw_it:" + std::to_string(db_id)}},
+                    {{"text", "⚡ Acting"}, {"callback_data", "acting:" + std::to_string(db_id)}}
                 },
                 {
-                    {{"text", "❌ Skip", "callback_data", "skip:" + std::to_string(db_id)}},
-                    {{"text", "⏸ Defer", "callback_data", "defer:" + std::to_string(db_id)}},
-                    {{"text", "📝 Note", "callback_data", "note:" + std::to_string(db_id)}}
+                    {{"text", "❌ Skip"}, {"callback_data", "skip:" + std::to_string(db_id)}},
+                    {{"text", "⏸ Defer"}, {"callback_data", "defer:" + std::to_string(db_id)}},
+                    {{"text", "📝 Note"}, {"callback_data", "note:" + std::to_string(db_id)}}
                 }
             }}
         };
@@ -716,9 +718,13 @@ void AlertDispatcher::process_queued_alerts(std::vector<Alert>& alerts) {
 }
 
 void AlertDispatcher::send_to_channels(const Alert& alert, const std::string& custom_text, const std::string& custom_markup) {
-    std::string chat_id = tg_bot_->get_chat_id(alert.tier);
-    if (!chat_id.empty()) {
-        tg_bot_->send_message(chat_id, custom_text, custom_markup);
+    auto enabled_val = store_->get_setting("telegram_enabled");
+    bool telegram_enabled = !enabled_val || (*enabled_val == "true");
+    if (telegram_enabled) {
+        std::string chat_id = tg_bot_->get_chat_id(alert.tier);
+        if (!chat_id.empty()) {
+            tg_bot_->send_message(chat_id, custom_text, custom_markup);
+        }
     }
     
     // Premium only Pushover dual-channel push
@@ -787,6 +793,10 @@ void AlertDispatcher::digest_check_loop() {
 }
 
 void AlertDispatcher::send_daily_digest() {
+    auto enabled_val = store_->get_setting("telegram_enabled");
+    bool telegram_enabled = !enabled_val || (*enabled_val == "true");
+    if (!telegram_enabled) return;
+
     std::string chat_id = tg_bot_->get_chat_id("digest");
     if (chat_id.empty()) {
         std::cerr << "[AlertDispatcher] Cannot send daily digest. Digest Chat ID is empty." << std::endl;

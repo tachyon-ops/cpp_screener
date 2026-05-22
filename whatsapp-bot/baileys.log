@@ -97,3 +97,82 @@
 [2026-05-22T00:17:35.902Z] Connection update: connecting
 [2026-05-22T00:17:36.154Z] Connection update: undefined
 [2026-05-22T00:17:36.154Z] QR Code received
+[2026-05-22T00:18:16.160Z] Connection update: undefined
+[2026-05-22T00:18:16.161Z] QR Code received
+[2026-05-22T00:18:56.167Z] Connection update: undefined
+[2026-05-22T00:18:56.167Z] QR Code received
+[2026-05-22T00:19:29.047Z] Iniciando limpieza de recursos...
+[2026-05-22T00:31:52.487Z] Connection update: connecting
+[2026-05-22T00:31:52.998Z] Connection update: undefined
+[2026-05-22T00:31:52.998Z] QR Code received
+[2026-05-22T00:32:33.012Z] Connection update: undefined
+[2026-05-22T00:32:33.012Z] QR Code received
+[2026-05-22T00:33:13.018Z] Connection update: undefined
+[2026-05-22T00:33:13.018Z] QR Code received
+[2026-05-22T00:33:53.026Z] Connection update: undefined
+[2026-05-22T00:33:53.027Z] QR Code received
+[2026-05-22T00:34:33.034Z] Connection update: undefined
+[2026-05-22T00:34:33.034Z] QR Code received
+[2026-05-22T00:35:13.038Z] Connection update: undefined
+[2026-05-22T00:35:13.038Z] QR Code received
+[2026-05-22T00:35:23.899Z] Connection update: close
+[2026-05-22T00:35:23.899Z] Connection closed. Status: 428, Reason: Connection Terminated by Server
+[2026-05-22T00:35:23.899Z] Reconnection attempt 1/10 in 1000ms
+[2026-05-22T00:35:24.914Z] Connection update: connecting
+[2026-05-22T00:35:25.314Z] Connection update: undefined
+[2026-05-22T00:35:25.314Z] QR Code received
+[2026-05-22T00:36:05.320Z] Connection update: undefined
+[2026-05-22T00:36:05.320Z] QR Code received
+Error: Connection Closed
+    at sendRawMessage (file:///Users/nunoribeiro/repos/cpp_screener/node_modules/.pnpm/baileys@7.0.0-rc.9_jimp@1.6.1_sharp@0.33.3/node_modules/baileys/lib/Socket/socket.js:50:19)
+    at sendNode (file:///Users/nunoribeiro/repos/cpp_screener/node_modules/.pnpm/baileys@7.0.0-rc.9_jimp@1.6.1_sharp@0.33.3/node_modules/baileys/lib/Socket/socket.js:69:16)
+    at Object.requestPairingCode (file:///Users/nunoribeiro/repos/cpp_screener/node_modules/.pnpm/baileys@7.0.0-rc.9_jimp@1.6.1_sharp@0.33.3/node_modules/baileys/lib/Socket/socket.js:596:15)
+    at async BaileysProvider.initVendor (file:///Users/nunoribeiro/repos/cpp_screener/node_modules/.pnpm/@builderbot+provider-baileys@1.4.1/node_modules/@builderbot/provider-baileys/dist/index.mjs:33825:38) {
+  data: null,
+  isBoom: true,
+  isServer: false,
+  output: {
+    statusCode: 428,
+    payload: {
+      statusCode: 428,
+      error: 'Precondition Required',
+      message: 'Connection Closed'
+    },
+    headers: {}
+  }
+}
+[2026-05-22T00:36:41.129Z] Unhandled Rejection at: Promise {
+  <rejected> Error: Vendor should not return empty
+      at BaileysProvider.listenOnEvents (/Users/nunoribeiro/repos/cpp_screener/node_modules/.pnpm/@builderbot+bot@1.4.1/node_modules/@builderbot/bot/dist/index.cjs:34738:19)
+      at /Users/nunoribeiro/repos/cpp_screener/node_modules/.pnpm/@builderbot+bot@1.4.1/node_modules/@builderbot/bot/dist/index.cjs:34715:35
+} reason: Error: Vendor should not return empty
+    at BaileysProvider.listenOnEvents (/Users/nunoribeiro/repos/cpp_screener/node_modules/.pnpm/@builderbot+bot@1.4.1/node_modules/@builderbot/bot/dist/index.cjs:34738:19)
+    at /Users/nunoribeiro/repos/cpp_screener/node_modules/.pnpm/@builderbot+bot@1.4.1/node_modules/@builderbot/bot/dist/index.cjs:34715:35
+Error: Connection Closed
+    at sendRawMessage (file:///Users/nunoribeiro/repos/cpp_screener/node_modules/.pnpm/baileys@7.0.0-rc.9_jimp@1.6.1_sharp@0.33.3/node_modules/baileys/lib/Socket/socket.js:50:19)
+    at sendNode (file:///Users/nunoribeiro/repos/cpp_screener/node_modules/.pnpm/baileys@7.0.0-rc.9_jimp@1.6.1_sharp@0.33.3/node_modules/baileys/lib/Socket/socket.js:69:16)
+    at Object.requestPairingCode (file:///Users/nunoribeiro/repos/cpp_screener/node_modules/.pnpm/baileys@7.0.0-rc.9_jimp@1.6.1_sharp@0.33.3/node_modules/baileys/lib/Socket/socket.js:596:15)
+    at async BaileysProvider.initVendor (file:///Users/nunoribeiro/repos/cpp_screener/node_modules/.pnpm/@builderbot+provider-baileys@1.4.1/node_modules/@builderbot/provider-baileys/dist/index.mjs:33825:38) {
+  data: null,
+  isBoom: true,
+  isServer: false,
+  output: {
+    statusCode: 428,
+    payload: {
+      statusCode: 428,
+      error: 'Precondition Required',
+      message: 'Connection Closed'
+    },
+    headers: {}
+  }
+}
+[2026-05-22T00:36:59.471Z] Unhandled Rejection at: Promise {
+  <rejected> Error: Vendor should not return empty
+      at BaileysProvider.listenOnEvents (/Users/nunoribeiro/repos/cpp_screener/node_modules/.pnpm/@builderbot+bot@1.4.1/node_modules/@builderbot/bot/dist/index.cjs:34738:19)
+      at /Users/nunoribeiro/repos/cpp_screener/node_modules/.pnpm/@builderbot+bot@1.4.1/node_modules/@builderbot/bot/dist/index.cjs:34715:35
+} reason: Error: Vendor should not return empty
+    at BaileysProvider.listenOnEvents (/Users/nunoribeiro/repos/cpp_screener/node_modules/.pnpm/@builderbot+bot@1.4.1/node_modules/@builderbot/bot/dist/index.cjs:34738:19)
+    at /Users/nunoribeiro/repos/cpp_screener/node_modules/.pnpm/@builderbot+bot@1.4.1/node_modules/@builderbot/bot/dist/index.cjs:34715:35
+[2026-05-22T00:39:01.235Z] Connection update: undefined
+[2026-05-22T00:39:41.237Z] Connection update: undefined
+[2026-05-22T00:40:21.238Z] Connection update: undefined

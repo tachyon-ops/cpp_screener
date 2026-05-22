@@ -214,6 +214,12 @@ const skipFlow = addKeyword<BaileysProvider, MemoryDB>('/^\\\\/skip\\\\s+(\\\\d+
 // Programmatic message dispatch helper
 async function sendWhatsAppMessage(botInstance: any, provider: any, jid: string, text: string) {
     try {
+        const isConnected = !!(provider?.vendor?.user || botInstance?.provider?.vendor?.user);
+        if (!isConnected) {
+            console.log(`[WS] Bypassing message transmission: WhatsApp provider is not connected/linked yet.`);
+            return;
+        }
+
         if (botInstance.sendMessage) {
             await botInstance.sendMessage(jid, text, {});
         } else if (botInstance.provider && botInstance.provider.sendMessage) {
@@ -309,8 +315,34 @@ const main = async () => {
         console.error(`[Bot] Failed to fetch latest Baileys version, using fallback:`, e.message);
     }
 
+    // Determine phone number for pairing code fallback
+    let pairingPhoneNumber: string | undefined = process.env.WHATSAPP_PHONE_NUMBER;
+    if (!pairingPhoneNumber) {
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/settings`);
+            if (res.ok) {
+                const settings = await res.json() as Record<string, string>;
+                if (settings.whatsapp_enabled === 'true' && settings.whatsapp_recipient) {
+                    pairingPhoneNumber = settings.whatsapp_recipient.replace(/\D/g, '');
+                    console.log(`[Bot] No explicit WHATSAPP_PHONE_NUMBER env var found. Using database recipient number for pairing: ${pairingPhoneNumber}`);
+                }
+            }
+        } catch (e: any) {
+            console.error(`[Bot] Could not fetch settings from C++ engine for pairing number lookup:`, e.message);
+        }
+    }
+
+    const providerOptions: any = { version };
+    if (pairingPhoneNumber) {
+        providerOptions.usePairingCode = true;
+        providerOptions.phoneNumber = pairingPhoneNumber;
+        console.log(`[Bot] Pairing code mode configured with phone number: ${pairingPhoneNumber}`);
+    } else {
+        console.log(`[Bot] QR code scan mode configured (no pairing phone number available).`);
+    }
+
     const adapterFlow = createFlow([helpFlow, regimeFlow, candidatesFlow, alertsFlow, actFlow, skipFlow]);
-    const adapterProvider = createProvider(BaileysProvider, { version });
+    const adapterProvider = createProvider(BaileysProvider, providerOptions);
     const adapterDB = new MemoryDB();
 
     console.log('[Bot] Starting BuilderBot service...');

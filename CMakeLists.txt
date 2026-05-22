@@ -70,9 +70,8 @@ include_directories(
     ${OPENSSL_INCLUDE_DIR}
 )
 
-# Source files
-set(SOURCE_FILES
-    src/main.cpp
+# Common source files (excluding main.cpp)
+set(COMMON_SOURCE_FILES
     src/broker/saxo_adapter.cpp
     src/storage/token_store.cpp
     src/persistence/sqlite_store.cpp
@@ -93,7 +92,7 @@ set(SOURCE_FILES
 )
 
 # Executable target
-add_executable(trader_engine ${SOURCE_FILES})
+add_executable(trader_engine src/main.cpp ${COMMON_SOURCE_FILES})
 
 # Link libraries
 target_link_libraries(trader_engine
@@ -109,4 +108,26 @@ target_link_libraries(trader_engine
 
 # Enable cpp-httplib to use OpenSSL for HTTPS and define ASIO_STANDALONE for Crow
 target_compile_definitions(trader_engine PRIVATE CPPHTTPLIB_OPENSSL_SUPPORT ASIO_STANDALONE)
+
+# Test target
+set(TEST_SOURCE_FILES
+    tests/test_runner.cpp
+    tests/test_screener.cpp
+)
+
+add_executable(trader_tests ${TEST_SOURCE_FILES} ${COMMON_SOURCE_FILES})
+
+target_link_libraries(trader_tests
+    PRIVATE
+        SQLite3::SQLite3
+        OpenSSL::SSL
+        OpenSSL::Crypto
+        nlohmann_json::nlohmann_json
+        httplib::httplib
+        Crow
+        webview::core
+)
+
+target_compile_definitions(trader_tests PRIVATE CPPHTTPLIB_OPENSSL_SUPPORT ASIO_STANDALONE)
+
 

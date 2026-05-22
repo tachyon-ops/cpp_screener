@@ -73,6 +73,14 @@ void TelegramBot::reload_chat_ids() {
         return env_val ? std::string(env_val) : std::string("");
     };
 
+    std::string old_token = bot_token_;
+    bot_token_ = get_db_setting("tg_bot_token", "TELEGRAM_BOT_TOKEN");
+    if (bot_token_ != old_token) {
+        std::cout << "[TelegramBot] Bot token updated: " 
+                  << (bot_token_.empty() ? "[EMPTY]" : (bot_token_.substr(0, std::min<size_t>(4, bot_token_.size())) + "..." + bot_token_.substr(bot_token_.size() > 4 ? bot_token_.size() - 4 : 0))) 
+                  << std::endl;
+    }
+
     chat_premium_ = get_db_setting("tg_chat_premium", "TG_CHAT_PREMIUM");
     chat_opportunity_ = get_db_setting("tg_chat_opportunity", "TG_CHAT_OPPORTUNITY");
     chat_digest_ = get_db_setting("tg_chat_digest", "TG_CHAT_DIGEST");
@@ -90,11 +98,6 @@ std::string TelegramBot::get_chat_id(const std::string& tier) const {
 }
 
 void TelegramBot::start() {
-    if (bot_token_.empty()) {
-        std::cerr << "[TelegramBot] Cannot start. Bot Token is empty." << std::endl;
-        return;
-    }
-    
     if (running_) return;
     
     running_ = true;
@@ -181,9 +184,23 @@ bool TelegramBot::answer_callback_query(const std::string& callback_query_id, co
 }
 
 void TelegramBot::poll_loop() {
-    std::cout << "[TelegramBot] Polling thread spawned. Starting long-polling." << std::endl;
+    std::cout << "[TelegramBot] Polling thread spawned." << std::endl;
+    auto last_reload = std::chrono::steady_clock::now();
+    bool first_loop = true;
     while (running_) {
         try {
+            auto now = std::chrono::steady_clock::now();
+            if (first_loop || std::chrono::duration_cast<std::chrono::seconds>(now - last_reload).count() >= 5) {
+                reload_chat_ids();
+                last_reload = now;
+                first_loop = false;
+            }
+
+            if (bot_token_.empty()) {
+                std::this_thread::sleep_for(std::chrono::seconds(2));
+                continue;
+            }
+
             nlohmann::json body = {
                 {"timeout", 30},
                 {"allowed_updates", {"message", "callback_query"}}
@@ -213,11 +230,17 @@ void TelegramBot::handle_update(const nlohmann::json& update) {
         int64_t message_id = msg["message_id"].get<int64_t>();
         std::string text = msg.value("text", "");
         
+        std::cout << "[TelegramBot] Received message: \"" << text << "\" from Chat ID: " << chat_id << std::endl;
+        
         if (!text.empty() && text[0] == '/') {
             handle_text_command(chat_id, text, message_id);
         }
     } else if (update.contains("callback_query")) {
-        handle_callback_query(update["callback_query"]);
+        auto callback = update["callback_query"];
+        std::string callback_id = callback.value("id", "");
+        std::string data = callback.value("data", "");
+        std::cout << "[TelegramBot] Received callback: \"" << data << "\" from Callback ID: " << callback_id << std::endl;
+        handle_callback_query(callback);
     }
 }
 
@@ -397,16 +420,16 @@ void TelegramBot::handle_callback_query(const nlohmann::json& callback) {
         nlohmann::json skip_keyboard = {
             {"inline_keyboard", {
                 {
-                    {{"text", "Wrong Regime", "callback_data", "skip_reason:Wrong Regime:" + std::to_string(alert_id)}},
-                    {{"text", "Bad News", "callback_data", "skip_reason:Bad News:" + std::to_string(alert_id)}}
+                    {{"text", "Wrong Regime"}, {"callback_data", "skip_reason:Wrong Regime:" + std::to_string(alert_id)}},
+                    {{"text", "Bad News"}, {"callback_data", "skip_reason:Bad News:" + std::to_string(alert_id)}}
                 },
                 {
-                    {{"text", "Size Too Large", "callback_data", "skip_reason:Size Too Large:" + std::to_string(alert_id)}},
-                    {{"text", "Correlated Pos", "callback_data", "skip_reason:Correlated Pos:" + std::to_string(alert_id)}}
+                    {{"text", "Size Too Large"}, {"callback_data", "skip_reason:Size Too Large:" + std::to_string(alert_id)}},
+                    {{"text", "Correlated Pos"}, {"callback_data", "skip_reason:Correlated Pos:" + std::to_string(alert_id)}}
                 },
                 {
-                    {{"text", "Don't Trust", "callback_data", "skip_reason:Don't Trust:" + std::to_string(alert_id)}},
-                    {{"text", "Other", "callback_data", "skip_reason:Other:" + std::to_string(alert_id)}}
+                    {{"text", "Don't Trust"}, {"callback_data", "skip_reason:Don't Trust:" + std::to_string(alert_id)}},
+                    {{"text", "Other"}, {"callback_data", "skip_reason:Other:" + std::to_string(alert_id)}}
                 }
             }}
         };

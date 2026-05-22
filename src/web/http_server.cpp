@@ -541,6 +541,33 @@ HttpServer::HttpServer(
 
             pimpl_->store->add_instrument(inst);
 
+            // Dynamically register subscription if we successfully fetched it
+            auto added_opt = pimpl_->store->get_instrument_by_symbol(inst.symbol);
+            if (added_opt) {
+                pimpl_->ts_store->pre_populate(added_opt->symbol, 150.0);
+
+                trader::core::InstrumentId id;
+                id.broker = "saxo";
+                id.native_id = added_opt->symbol; // Saxo fallback resolves on symbol keywords
+                id.asset_type = added_opt->asset_class == "ETF" ? "Etf" : "Stock";
+
+                auto self = this;
+                auto ts = pimpl_->ts_store;
+                pimpl_->broker->subscribe_quotes(id, [self, added_inst = *added_opt, ts](const trader::core::Tick& tick) {
+                    ts->get_or_create(added_inst.symbol)->append_tick(tick);
+
+                    nlohmann::json tick_data;
+                    tick_data["symbol"] = added_inst.symbol;
+                    tick_data["instrument_id"] = added_inst.id;
+                    tick_data["ts"] = tick.ts.ms_since_epoch;
+                    tick_data["bid"] = tick.bid.value;
+                    tick_data["ask"] = tick.ask.value;
+                    tick_data["last"] = (tick.bid.value + tick.ask.value) / 2.0;
+                    
+                    self->broadcast_tick(tick_data.dump());
+                });
+            }
+
             nlohmann::json res;
             res["status"] = "success";
             res["symbol"] = inst.symbol;
@@ -688,10 +715,19 @@ HttpServer::HttpServer(
             auto pairs = pimpl_->store->get_all_settings();
             nlohmann::json obj = nlohmann::json::object();
             for (const auto& pair : pairs) {
-                obj[pair.first] = pair.second;
+                if (pair.first == "tg_bot_token" && pair.second.length() > 8) {
+                    obj[pair.first] = pair.second.substr(0, 4) + "••••••••" + pair.second.substr(pair.second.length() - 4);
+                } else {
+                    obj[pair.first] = pair.second;
+                }
             }
             if (!obj.contains("whatsapp_enabled")) obj["whatsapp_enabled"] = "false";
             if (!obj.contains("whatsapp_recipient")) obj["whatsapp_recipient"] = "";
+            if (!obj.contains("telegram_enabled")) obj["telegram_enabled"] = "false";
+            if (!obj.contains("tg_bot_token")) obj["tg_bot_token"] = "";
+            if (!obj.contains("tg_chat_premium")) obj["tg_chat_premium"] = "";
+            if (!obj.contains("tg_chat_opportunity")) obj["tg_chat_opportunity"] = "";
+            if (!obj.contains("tg_chat_digest")) obj["tg_chat_digest"] = "";
             return crow::response(200, obj.dump());
         } catch (const std::exception& e) {
             nlohmann::json err = {{"error", e.what()}};
@@ -704,13 +740,21 @@ HttpServer::HttpServer(
         try {
             auto body = nlohmann::json::parse(req.body);
             for (auto it = body.begin(); it != body.end(); ++it) {
+                std::string key = it.key();
+                std::string val = "";
                 if (it.value().is_string()) {
-                    pimpl_->store->set_setting(it.key(), it.value().get<std::string>());
+                    val = it.value().get<std::string>();
                 } else if (it.value().is_boolean()) {
-                    pimpl_->store->set_setting(it.key(), it.value().get<bool>() ? "true" : "false");
+                    val = it.value().get<bool>() ? "true" : "false";
                 } else if (it.value().is_number()) {
-                    pimpl_->store->set_setting(it.key(), std::to_string(it.value().get<double>()));
+                    val = std::to_string(it.value().get<double>());
                 }
+
+                if (key == "tg_bot_token" && val.find("••••") != std::string::npos) {
+                    continue; // Preserve masked token
+                }
+
+                pimpl_->store->set_setting(key, val);
             }
             nlohmann::json res = {{"status", "success"}};
             return crow::response(200, res.dump());

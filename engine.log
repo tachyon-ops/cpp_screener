@@ -1,0 +1,169 @@
+==================================================
+        TACHYON TRADING ENGINE (C++)              
+==================================================
+[Engine] SQLite Persistence database initialized.
+[Engine] Checking/updating Stock metadata for Screen B...
+[Engine] Updated metadata for stock AAPL: {"asset_type":"Stock","name":"Apple Inc.","next_earnings_date":"2026-06-21","sector_etf_symbol":"XLK"}
+[Engine] Updated metadata for stock MSFT: {"asset_type":"Stock","name":"Microsoft Corp.","next_earnings_date":"2026-05-25","sector_etf_symbol":"XLK"}
+[Engine] Updated metadata for stock TSLA: {"asset_type":"Stock","name":"Tesla Inc.","next_earnings_date":"2026-07-06","sector_etf_symbol":"XLY"}
+[Engine] Updated metadata for stock NVDA: {"asset_type":"Stock","name":"NVIDIA Corp.","next_earnings_date":"2026-07-21","sector_etf_symbol":"XLK"}
+[SaxoBrokerAdapter] Loaded tokens from DB for user: default
+[Engine] Authenticating Saxo Bank API...
+[SaxoBrokerAdapter] Reloaded tokens from DB.
+[Engine] Saxo Bank API successfully authenticated.
+[RegimeClassifier] Loaded current regime from DB: chop
+[TelegramBot] Loaded chat configurations:
+  Premium Chat ID:     12345
+  Opportunity Chat ID: 12346
+  Digest Chat ID:      12347
+[AlertDispatcher] Loaded 3 cluster definitions from YAML.
+[ScreenG] Config loaded: correlation_period=30, zscore_period=90, zscore_threshold=2, loaded pairs=3
+[ScreenC] Config loaded: vol_drop_threshold=3, wick_ratio=0.6, volume_mult=2, panic_drawdown_percentile=0.05
+[HttpServer] Starting Crow Web Server on port 8080...
+[TelegramBot] Polling thread spawned.
+[AlertDispatcher] Alert Dispatcher threads started.
+[AlertDispatcher] Started processing worker thread.
+[AlertDispatcher] Started digest monitor thread.
+[TelegramBot] Loaded chat configurations:[Engine] Checking/Seeding daily bars for Screen E (BST/BST.NAV) and Screen F (NVDA)...
+
+  Premium Chat ID:     12345
+  Opportunity Chat ID: 12346
+  Digest Chat ID:      12347
+[PositionManager] Background thread started.
+[Engine] Seeding/Calculating initial EOD regime and Screen D rotation board...
+[RegimeClassifier] Warning: Not enough SPY daily bars (need 219, got 1) for MA calculation. Falling back to default trend score.
+[RegimeClassifier] Evaluated date 2026-05-22: chop (vix=14.5, oas=3.25, breadth=0.76, spx_vs_200ma=0)
+[ScreenD] Running Industry Rotation calculations for date: 2026-05-22
+(2026-05-22 00:47:28) [INFO    ] Crow/master server is running at http://0.0.0.0:8080 using 10 threads
+(2026-05-22 00:47:28) [INFO    ] Call `app.loglevel(crow::LogLevel::Warning)` to hide Info level logs.
+[ScreenD] Industry Rotation calculations complete. Evaluated 70 instruments.
+[ScreenB] Running Swing Pullback calculations for date: 2026-05-22
+[ScreenB] Swing Pullback calculations complete. Registered 2 candidates.
+[ScreenE] Running CEF Discount calculations for date: 2026-05-22
+[ScreenF] Running Darvas Box Breakout calculations for date: 2026-05-22
+[ScreenG] Cross-Asset Divergence evaluation complete. Results: 3
+[ScreenC] Added BTCUSD to watch list for 72 hours.
+[ScreenC] Added ETHUSD to watch list for 72 hours.
+[ScreenC] Added NDX to watch list for 72 hours.
+[ScreenC] Added ^N225 to watch list for 72 hours.
+[ScreenC] Added ^STOXX to watch list for 72 hours.
+[ScreenC] Capitulation Wick Reversal evaluation complete. Results: 0
+[Engine] Pre-populating TimeSeriesStore with mock historical intraday bars...
+[TimeSeriesStore] Pre-populated SPY for all resolutions (M1-W1) at base price $150
+[TimeSeriesStore] Pre-populated QQQ for all resolutions (M1-W1) at base price $150
+[TimeSeriesStore] Pre-populated AAPL for all resolutions (M1-W1) at base price $235.01
+[TimeSeriesStore] Pre-populated MSFT for all resolutions (M1-W1) at base price $490.134
+[TimeSeriesStore] Pre-populated TSLA for all resolutions (M1-W1) at base price $278.624
+[TimeSeriesStore] Pre-populated NVDA for all resolutions (M1-W1) at base price $762.877
+[TimeSeriesStore] Pre-populated XLK for all resolutions (M1-W1) at base price $233.517
+[TimeSeriesStore] Pre-populated XLF for all resolutions (M1-W1) at base price $46.4841
+[TimeSeriesStore] Pre-populated XLE for all resolutions (M1-W1) at base price $89.1643
+[TimeSeriesStore] Pre-populated XLV for all resolutions (M1-W1) at base price $164.378
+[TimeSeriesStore] Pre-populated XLI for all resolutions (M1-W1) at base price $119.708
+[TimeSeriesStore] Pre-populated XLY for all resolutions (M1-W1) at base price $191.182
+[TimeSeriesStore] Pre-populated XLP for all resolutions (M1-W1) at base price $94.3507
+[TimeSeriesStore] Pre-populated XLB for all resolutions (M1-W1) at base price $80.0877
+[TimeSeriesStore] Pre-populated XLU for all resolutions (M1-W1) at base price $62.9836
+[TimeSeriesStore] Pre-populated XLRE for all resolutions (M1-W1) at base price $23.4435
+[TimeSeriesStore] Pre-populated SMH for all resolutions (M1-W1) at base price $318.101
+[TimeSeriesStore] Pre-populated XBI for all resolutions (M1-W1) at base price $80.4097
+[TimeSeriesStore] Pre-populated KRE for all resolutions (M1-W1) at base price $55.5435
+[TimeSeriesStore] Pre-populated IBB for all resolutions (M1-W1) at base price $75.831
+[TimeSeriesStore] Pre-populated ITB for all resolutions (M1-W1) at base price $90.5844
+[TimeSeriesStore] Pre-populated XHB for all resolutions (M1-W1) at base price $79.7899
+[TimeSeriesStore] Pre-populated VNQ for all resolutions (M1-W1) at base price $28.6558
+[TimeSeriesStore] Pre-populated IYR for all resolutions (M1-W1) at base price $92.4819
+[TimeSeriesStore] Pre-populated OIH for all resolutions (M1-W1) at base price $134.464
+[TimeSeriesStore] Pre-populated XOP for all resolutions (M1-W1) at base price $122.415
+[TimeSeriesStore] Pre-populated GDX for all resolutions (M1-W1) at base price $131.501
+[TimeSeriesStore] Pre-populated GDXJ for all resolutions (M1-W1) at base price $139.488
+[TimeSeriesStore] Pre-populated XME for all resolutions (M1-W1) at base price $80.2034
+[TimeSeriesStore] Pre-populated KBE for all resolutions (M1-W1) at base price $75.7249
+[TimeSeriesStore] Pre-populated XRT for all resolutions (M1-W1) at base price $109.058
+[TimeSeriesStore] Pre-populated IYT for all resolutions (M1-W1) at base price $144.94
+[TimeSeriesStore] Pre-populated XSD for all resolutions (M1-W1) at base price $118.902
+[TimeSeriesStore] Pre-populated SKYY for all resolutions (M1-W1) at base price $63.5421
+[TimeSeriesStore] Pre-populated TAN for all resolutions (M1-W1) at base price $73.0136
+[TimeSeriesStore] Pre-populated LIT for all resolutions (M1-W1) at base price $43.4153
+[TimeSeriesStore] Pre-populated URA for all resolutions (M1-W1) at base price $64.7075
+[TimeSeriesStore] Pre-populated COPX for all resolutions (M1-W1) at base price $75.5024
+[TimeSeriesStore] Pre-populated REMX for all resolutions (M1-W1) at base price $34.7294
+[TimeSeriesStore] Pre-populated PEJ for all resolutions (M1-W1) at base price $100.803
+[TimeSeriesStore] Pre-populated IHF for all resolutions (M1-W1) at base price $41.3963
+[TimeSeriesStore] Pre-populated IHI for all resolutions (M1-W1) at base price $130.406
+[TimeSeriesStore] Pre-populated ITA for all resolutions (M1-W1) at base price $92.7634
+[TimeSeriesStore] Pre-populated PPA for all resolutions (M1-W1) at base price $87.4311
+[TimeSeriesStore] Pre-populated ICLN for all resolutions (M1-W1) at base price $94.5178
+[TimeSeriesStore] Pre-populated BJK for all resolutions (M1-W1) at base price $38.6527
+[TimeSeriesStore] Pre-populated PBS for all resolutions (M1-W1) at base price $102.45
+[TimeSeriesStore] Pre-populated GRID for all resolutions (M1-W1) at base price $29.2413
+[TimeSeriesStore] Pre-populated IPO for all resolutions (M1-W1) at base price $113.333
+[TimeSeriesStore] Pre-populated FPX for all resolutions (M1-W1) at base price $104.289
+[TimeSeriesStore] Pre-populated SOCL for all resolutions (M1-W1) at base price $102.725
+[TimeSeriesStore] Pre-populated HACK for all resolutions (M1-W1) at base price $154.126
+[TimeSeriesStore] Pre-populated CIBR for all resolutions (M1-W1) at base price $78.0503
+[TimeSeriesStore] Pre-populated BOTZ for all resolutions (M1-W1) at base price $147.068
+[TimeSeriesStore] Pre-populated ROBO for all resolutions (M1-W1) at base price $50.7467
+[TimeSeriesStore] Pre-populated FINX for all resolutions (M1-W1) at base price $115.896
+[TimeSeriesStore] Pre-populated IPAY for all resolutions (M1-W1) at base price $24.4718
+[TimeSeriesStore] Pre-populated BUG for all resolutions (M1-W1) at base price $104.146
+[TimeSeriesStore] Pre-populated HEROS for all resolutions (M1-W1) at base price $115.606
+[TimeSeriesStore] Pre-populated NERD for all resolutions (M1-W1) at base price $102.218
+[TimeSeriesStore] Pre-populated PHO for all resolutions (M1-W1) at base price $120.784
+[TimeSeriesStore] Pre-populated FIW for all resolutions (M1-W1) at base price $77.7075
+[TimeSeriesStore] Pre-populated ARKG for all resolutions (M1-W1) at base price $51.1308
+[TimeSeriesStore] Pre-populated ARKK for all resolutions (M1-W1) at base price $76.6763
+[TimeSeriesStore] Pre-populated ARKW for all resolutions (M1-W1) at base price $42.4636
+[TimeSeriesStore] Pre-populated ARKF for all resolutions (M1-W1) at base price $130.621
+[TimeSeriesStore] Pre-populated ARKQ for all resolutions (M1-W1) at base price $46.2336
+[TimeSeriesStore] Pre-populated PJP for all resolutions (M1-W1) at base price $115.11
+[TimeSeriesStore] Pre-populated IHE for all resolutions (M1-W1) at base price $130.583
+[TimeSeriesStore] Pre-populated IYJ for all resolutions (M1-W1) at base price $102.08
+[TimeSeriesStore] Pre-populated IYC for all resolutions (M1-W1) at base price $51.8457
+[TimeSeriesStore] Pre-populated IYE for all resolutions (M1-W1) at base price $198.191
+[TimeSeriesStore] Pre-populated IYG for all resolutions (M1-W1) at base price $108.95
+[TimeSeriesStore] Pre-populated IYH for all resolutions (M1-W1) at base price $75.6763
+[TimeSeriesStore] Pre-populated IYM for all resolutions (M1-W1) at base price $79.5656
+[TimeSeriesStore] Pre-populated XSW for all resolutions (M1-W1) at base price $92.6451
+[TimeSeriesStore] Pre-populated BST for all resolutions (M1-W1) at base price $18.009
+[TimeSeriesStore] Pre-populated BST.NAV for all resolutions (M1-W1) at base price $23
+[TimeSeriesStore] Pre-populated BTCUSD for all resolutions (M1-W1) at base price $56000
+[TimeSeriesStore] Pre-populated ETHUSD for all resolutions (M1-W1) at base price $2734.39
+[TimeSeriesStore] Pre-populated NDX for all resolutions (M1-W1) at base price $16722.1
+[TimeSeriesStore] Pre-populated ^N225 for all resolutions (M1-W1) at base price $35221.6
+[TimeSeriesStore] Pre-populated ^STOXX for all resolutions (M1-W1) at base price $4467.72
+[TimeSeriesStore] Pre-populated GOOGL for all resolutions (M1-W1) at base price $139.072
+[TimeSeriesStore] Pre-populated META for all resolutions (M1-W1) at base price $131.98
+[TimeSeriesStore] Pre-populated AMZN for all resolutions (M1-W1) at base price $123.775
+[TimeSeriesStore] Pre-populated NFLX for all resolutions (M1-W1) at base price $99.4088
+[TimeSeriesStore] Pre-populated AMD for all resolutions (M1-W1) at base price $155.289
+[ScreenC] Added BTCUSD to watch list for 72 hours.
+[Engine] Connecting quote subscriptions to core screener feed...
+[Engine] Running in headless mode. Press Ctrl+C to terminate.
+[Telegram] API request 'sendMessage' failed.
+Status: 400, Body: {"ok":false,"error_code":400,"description":"Bad Request: can't parse inline keyboard button: InlineKeyboardButton must be an Object"}
+[RegimeClassifier] Warning: Not enough SPY daily bars (need 219, got 1) for MA calculation. Falling back to default trend score.
+[RegimeClassifier] Evaluated date 2026-05-22: chop (vix=14.9993, oas=3.2858, breadth=0.766743, spx_vs_200ma=0)
+[ScreenD] Running Industry Rotation calculations for date: 2026-05-22
+[ScreenD] Industry Rotation calculations complete. Evaluated 70 instruments.
+[ScreenB] Running Swing Pullback calculations for date: 2026-05-22
+[ScreenB] Swing Pullback calculations complete. Registered 2 candidates.
+[ScreenA] Pre-market evaluation complete for 2026-05-22. Registered candidate TSLA with -6.5% gap down.
+[ScreenE] Running CEF Discount calculations for date: 2026-05-22
+[ScreenF] Running Darvas Box Breakout calculations for date: 2026-05-22
+[ScreenG] Cross-Asset Divergence evaluation complete. Results: 3
+[ScreenC] Capitulation Wick Reversal evaluation complete. Results: 1
+[RegimeClassifier] Warning: Not enough SPY daily bars (need 219, got 1) for MA calculation. Falling back to default trend score.
+[RegimeClassifier] Evaluated date 2026-05-22: chop (vix=14.543, oas=3.23963, breadth=0.749683, spx_vs_200ma=0)
+[ScreenD] Running Industry Rotation calculations for date: 2026-05-22
+[ScreenD] Industry Rotation calculations complete. Evaluated 70 instruments.
+[ScreenB] Running Swing Pullback calculations for date: 2026-05-22
+[ScreenB] Swing Pullback calculations complete. Registered 2 candidates.
+[ScreenE] Running CEF Discount calculations for date: 2026-05-22
+[ScreenF] Running Darvas Box Breakout calculations for date: 2026-05-22
+[ScreenG] Cross-Asset Divergence evaluation complete. Results: 3
+[ScreenC] Capitulation Wick Reversal evaluation complete. Results: 1
+[TelegramBot] Loaded chat configurations:
+  Premium Chat ID:     12345
+  Opportunity Chat ID: 12346
+  Digest Chat ID:      12347

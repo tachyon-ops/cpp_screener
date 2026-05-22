@@ -160,7 +160,12 @@ function App() {
   const [candFilter, setCandFilter] = useState<'all' | 'active' | 'expired'>('active');
   const [settings, setSettings] = useState<Record<string, string>>({
     whatsapp_enabled: 'false',
-    whatsapp_recipient: ''
+    whatsapp_recipient: '',
+    telegram_enabled: 'false',
+    tg_bot_token: '',
+    tg_chat_premium: '',
+    tg_chat_opportunity: '',
+    tg_chat_digest: ''
   });
 
   // Saxo OpenAPI Credentials State
@@ -178,6 +183,7 @@ function App() {
   });
   const [showAppKey, setShowAppKey] = useState(false);
   const [showAppSecret, setShowAppSecret] = useState(false);
+  const [showTgToken, setShowTgToken] = useState(false);
   const [showAccessToken, setShowAccessToken] = useState(false);
   const [showRefreshToken, setShowRefreshToken] = useState(false);
   
@@ -814,7 +820,7 @@ function App() {
                 {/* Real-time Ticks Widget */}
                 <h3 className="text-lg font-bold text-white tracking-tight pt-2">Live Price Stream</h3>
                 <div className="glass border border-white/5 rounded-xl divide-y divide-white/5 overflow-hidden">
-                  {instruments.slice(0, 5).map((inst) => {
+                  {[...instruments].reverse().slice(0, 5).map((inst) => {
                     const price = ticks[inst.symbol];
                     return (
                       <div key={inst.id} className="p-4 flex justify-between items-center hover:bg-white/5 transition">
@@ -1771,6 +1777,7 @@ function App() {
                     <th className="p-4">Asset Class</th>
                     <th className="p-4">Exchange</th>
                     <th className="p-4">Saxo UIC</th>
+                    <th className="p-4">Live Price</th>
                     <th className="p-4">Metadata</th>
                   </tr>
                 </thead>
@@ -1782,6 +1789,9 @@ function App() {
                       <td className="p-4">{inst.asset_class}</td>
                       <td className="p-4">{inst.exchange}</td>
                       <td className="p-4">{inst.saxo_uic}</td>
+                      <td className="p-4 font-bold text-emerald-400">
+                        {ticks[inst.symbol] !== undefined ? `$${ticks[inst.symbol].toFixed(2)}` : 'Wait...'}
+                      </td>
                       <td className="p-4 text-gray-400 font-sans text-[11px] truncate max-w-xs">
                         {inst.metadata ? JSON.stringify(inst.metadata) : '{}'}
                       </td>
@@ -2373,33 +2383,175 @@ function App() {
                     </div>
                   </div>
                 </div>
+              </div>
 
-                <div className="pt-4 border-t border-white/5 flex justify-end">
-                  <button
-                    onClick={async () => {
-                      try {
-                        const response = await fetch('/api/settings', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify(settings)
-                        });
-                        if (response.ok) {
-                          showToast('Settings saved successfully', 'success');
-                          fetchData();
-                        } else {
-                          showToast('Failed to save settings', 'error');
-                        }
-                      } catch (e) {
-                        console.error('Failed to save settings:', e);
-                        showToast('Error connecting to backend', 'error');
-                      }
-                    }}
-                    className="bg-[#ff6d5a] hover:bg-[#ff8c7a] text-black text-xs font-bold rounded-lg px-6 py-2.5 transition shadow-[0_0_15px_rgba(255,109,90,0.2)]"
-                  >
-                    Save Configuration
-                  </button>
+              {/* Telegram Bot Configuration Card */}
+              <div className="glass border border-white/5 p-6 rounded-xl space-y-6 bg-black/20">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-lg text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.1)]">
+                    ✈️
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm text-white">Telegram Notifications</h3>
+                    <p className="text-[10px] text-gray-400">Configure falling_knives_bot alerts</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Toggle */}
+                  <div className="flex items-center justify-between p-3.5 bg-black/40 border border-white/5 rounded-lg">
+                    <div>
+                      <div className="text-xs font-bold text-white uppercase tracking-wider">Enable Telegram Alerts</div>
+                      <div className="text-[10px] text-gray-500 mt-0.5">Route real-time screener signals via Telegram</div>
+                    </div>
+                    <button
+                      onClick={() => setSettings(prev => ({ ...prev, telegram_enabled: prev.telegram_enabled === 'true' ? 'false' : 'true' }))}
+                      className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        settings.telegram_enabled === 'true' ? 'bg-[#ff6d5a]' : 'bg-white/10'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          settings.telegram_enabled === 'true' ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Token Input */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] text-gray-400 uppercase font-bold">Telegram Bot Token</label>
+                    <div className="relative">
+                      <input
+                        type={showTgToken ? "text" : "password"}
+                        placeholder={settings.tg_bot_token ? "••••••••••••••••••••••••••••••••••••••••" : "e.g. 8859988952:AAFkaAh9..."}
+                        value={settings.tg_bot_token || ''}
+                        onChange={(e) => setSettings(prev => ({ ...prev, tg_bot_token: e.target.value }))}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg pl-3 pr-10 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-[#ff6d5a] font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowTgToken(!showTgToken)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-xs"
+                      >
+                        {showTgToken ? 'Hide' : 'Show'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Chat IDs */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <label className="block text-[9px] text-gray-400 uppercase font-bold">Premium Chat ID</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. -100..."
+                        value={settings.tg_chat_premium || ''}
+                        onChange={(e) => setSettings(prev => ({ ...prev, tg_chat_premium: e.target.value }))}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-2.5 py-2 text-[11px] text-white placeholder-gray-600 focus:outline-none focus:border-[#ff6d5a] font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-[9px] text-gray-400 uppercase font-bold">Opportunity Chat ID</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. -100..."
+                        value={settings.tg_chat_opportunity || ''}
+                        onChange={(e) => setSettings(prev => ({ ...prev, tg_chat_opportunity: e.target.value }))}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-2.5 py-2 text-[11px] text-white placeholder-gray-600 focus:outline-none focus:border-[#ff6d5a] font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-[9px] text-gray-400 uppercase font-bold">Digest Chat ID</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. -100..."
+                        value={settings.tg_chat_digest || ''}
+                        onChange={(e) => setSettings(prev => ({ ...prev, tg_chat_digest: e.target.value }))}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-2.5 py-2 text-[11px] text-white placeholder-gray-600 focus:outline-none focus:border-[#ff6d5a] font-mono"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[9px] text-gray-500">
+                    Use Telegram commands in your chat (e.g. <code>/set_premium</code>) to bind automatically, or enter the ID manually.
+                  </p>
                 </div>
               </div>
+
+              {/* Telegram Bot Commands Card */}
+              <div className="glass border border-white/5 p-6 rounded-xl space-y-6 bg-black/20 flex flex-col justify-between">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-lg text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.1)]">
+                      🤖
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-sm text-white">Telegram Bot Commands</h3>
+                      <p className="text-[10px] text-gray-400">Control the engine remotely on Telegram</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-black/30 border border-white/5 rounded-lg p-4 space-y-2 font-mono text-[10px]">
+                    <div className="flex justify-between text-gray-400 border-b border-white/5 pb-1">
+                      <span>Command</span>
+                      <span>Description</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#ff6d5a]">/set_premium</span>
+                      <span className="text-gray-400 text-right">Register chat for Premium alerts</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#ff6d5a]">/set_opportunity</span>
+                      <span className="text-gray-400 text-right">Register chat for Opportunity alerts</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#ff6d5a]">/set_digest</span>
+                      <span className="text-gray-400 text-right">Register chat for Digest alerts</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#ff6d5a]">/status</span>
+                      <span className="text-gray-400 text-right">Show engine status & stats</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#ff6d5a]">/help</span>
+                      <span className="text-gray-400 text-right">Show help menu</span>
+                    </div>
+                  </div>
+                  <p className="text-[9px] text-gray-500">
+                    Supports inline buttons in messages for instant responses (e.g. taking trades on Saxo).
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Global Settings Actions */}
+            <div className="glass border border-white/5 p-4 rounded-xl flex justify-between items-center bg-black/20">
+              <div className="text-[10px] text-gray-400">
+                Saving updates notifications configurations in the SQLite persistence settings table.
+              </div>
+              <button
+                onClick={async () => {
+                  try {
+                    const response = await fetch('/api/settings', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(settings)
+                    });
+                    if (response.ok) {
+                      showToast('Settings saved successfully', 'success');
+                      fetchData();
+                    } else {
+                      showToast('Failed to save settings', 'error');
+                    }
+                  } catch (e) {
+                    console.error('Failed to save settings:', e);
+                    showToast('Error connecting to backend', 'error');
+                  }
+                }}
+                className="bg-[#ff6d5a] hover:bg-[#ff8c7a] text-black text-xs font-bold rounded-lg px-6 py-2.5 transition shadow-[0_0_15px_rgba(255,109,90,0.2)]"
+              >
+                Save Configuration
+              </button>
             </div>
 
             {/* Saxo Bank OpenAPI Credentials Card */}
