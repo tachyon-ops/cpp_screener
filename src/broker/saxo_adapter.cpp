@@ -3,6 +3,7 @@
 #include <httplib.h>
 #include <nlohmann/json.hpp>
 #include <iostream>
+#include <fstream>
 #include <sstream>
 #include <chrono>
 #include <thread>
@@ -254,6 +255,14 @@ SaxoBrokerAdapter::~SaxoBrokerAdapter() {
 }
 
 Result<void> SaxoBrokerAdapter::authenticate() {
+    if (pimpl_->store) {
+        auto db_tokens = pimpl_->store->load(pimpl_->config.user_id);
+        if (db_tokens) {
+            pimpl_->tokens = db_tokens;
+            pimpl_->parse_base_url();
+            std::cout << "[SaxoBrokerAdapter] Reloaded tokens from DB." << std::endl;
+        }
+    }
     if (pimpl_->check_and_refresh_token()) {
         return Result<void>::ok();
     }
@@ -395,16 +404,35 @@ Result<SubscriptionId> SaxoBrokerAdapter::subscribe_quotes(
             while (pimpl_->run_quote_thread) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000));
                 
+                // Fallback simulated prices for L1 local UI sandbox testing
+                static std::unordered_map<std::string, double> simulated_prices = {
+                    {"SPY", 520.0}, {"QQQ", 440.0}, {"AAPL", 180.0}, {"MSFT", 415.0},
+                    {"BTCUSD", 55100.0}, {"ETHUSD", 2900.0}, {"NDX", 17700.0},
+                    {"^N225", 37000.0}, {"^STOXX", 4600.0}, {"NVDA", 935.0},
+                    {"BST", 18.0}, {"BST.NAV", 23.0}, {"TSLA", 175.0}
+                };
+
+                // Check for file overrides
+                std::ifstream sim_file("./data/sim_prices.txt");
+                if (sim_file.is_open()) {
+                    std::string s_line;
+                    while (std::getline(sim_file, s_line)) {
+                        auto eq = s_line.find('=');
+                        if (eq != std::string::npos) {
+                            std::string s_sym = s_line.substr(0, eq);
+                            try {
+                                double s_val = std::stod(s_line.substr(eq + 1));
+                                simulated_prices[s_sym] = s_val;
+                            } catch (...) {}
+                        }
+                    }
+                }
+
                 std::lock_guard<std::mutex> inner_lock(pimpl_->subs_mutex);
                 for (const auto& [sub_id, pair] : pimpl_->subscriptions) {
                     const auto& instr = pair.first;
                     const auto& callback = pair.second;
 
-                    // Fallback simulated prices for L1 local UI sandbox testing
-                    static std::unordered_map<std::string, double> simulated_prices = {
-                        {"SPY", 520.0}, {"QQQ", 440.0}, {"AAPL", 180.0}, {"MSFT", 415.0}
-                    };
-                    
                     double base_price = 100.0;
                     if (simulated_prices.find(instr.native_id) != simulated_prices.end()) {
                         base_price = simulated_prices[instr.native_id];

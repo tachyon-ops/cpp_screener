@@ -190,6 +190,15 @@ void AlertDispatcher::dispatch(const Alert& alert) {
     queue_cv_.notify_one();
 }
 
+void AlertDispatcher::dispatch_telegram_message(const std::string& message) {
+    if (tg_bot_) {
+        std::string chat_id = tg_bot_->get_chat_id("premium");
+        if (!chat_id.empty()) {
+            tg_bot_->send_message(chat_id, message);
+        }
+    }
+}
+
 void AlertDispatcher::set_alert_callback(std::function<void(const std::string&)> cb) {
     std::lock_guard<std::mutex> lock(cb_mutex_);
     alert_cb_ = cb;

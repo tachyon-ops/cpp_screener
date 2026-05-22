@@ -4,6 +4,8 @@
 #include <mutex>
 #include <vector>
 #include <string>
+#include <unordered_map>
+#include <chrono>
 
 namespace trader {
 namespace core {
@@ -47,6 +49,10 @@ private:
     std::shared_ptr<core::AlertDispatcher> dispatcher_;
     mutable std::mutex results_mutex_;
     std::vector<ScreenFResult> latest_results_;
+
+    // Cooldown map: symbol -> end of cooldown time_point
+    std::unordered_map<std::string, std::chrono::system_clock::time_point> cooldowns_;
+    mutable std::mutex cooldowns_mutex_;
 };
 
 } // namespace screens

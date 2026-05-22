@@ -12,13 +12,14 @@
   "dependencies": {
     "@builderbot/bot": "^1.4.1",
     "@builderbot/provider-baileys": "^1.4.1",
-    "ws": "^8.16.0",
-    "dotenv": "^16.4.5"
+    "baileys": "7.0.0-rc.9",
+    "dotenv": "^16.4.5",
+    "ws": "^8.16.0"
   },
   "devDependencies": {
-    "typescript": "^5.3.3",
     "@types/node": "^20.11.24",
     "@types/ws": "^8.5.10",
-    "tsc-watch": "^6.0.4"
+    "tsc-watch": "^6.0.4",
+    "typescript": "^5.3.3"
   }
 }

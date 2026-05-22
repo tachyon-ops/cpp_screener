@@ -14,3 +14,86 @@
 [2026-05-21T23:50:03.470Z] Connection update: close
 [2026-05-21T23:50:03.470Z] Connection closed. Status: 405, Reason: Connection Failure
 [2026-05-21T23:50:03.470Z] Critical error, stopping reconnection attempts
+[2026-05-21T23:59:27.338Z] Connection update: connecting
+[2026-05-21T23:59:28.398Z] Connection update: undefined
+[2026-05-21T23:59:28.398Z] QR Code received
+[2026-05-22T00:00:08.417Z] Connection update: undefined
+[2026-05-22T00:00:08.418Z] QR Code received
+[2026-05-22T00:00:48.425Z] Connection update: undefined
+[2026-05-22T00:00:48.425Z] QR Code received
+[2026-05-22T00:01:28.430Z] Connection update: undefined
+[2026-05-22T00:01:28.430Z] QR Code received
+[2026-05-22T00:02:08.435Z] Connection update: undefined
+[2026-05-22T00:02:08.436Z] QR Code received
+[2026-05-22T00:02:48.442Z] Connection update: undefined
+[2026-05-22T00:02:48.443Z] QR Code received
+[2026-05-22T00:02:59.293Z] Connection update: close
+[2026-05-22T00:02:59.293Z] Connection closed. Status: 428, Reason: Connection Terminated by Server
+[2026-05-22T00:02:59.293Z] Reconnection attempt 1/10 in 1000ms
+[2026-05-22T00:03:00.310Z] Connection update: connecting
+[2026-05-22T00:03:00.692Z] Connection update: undefined
+[2026-05-22T00:03:00.692Z] QR Code received
+[2026-05-22T00:03:40.696Z] Connection update: undefined
+[2026-05-22T00:03:40.696Z] QR Code received
+[2026-05-22T00:04:20.703Z] Connection update: undefined
+[2026-05-22T00:04:20.703Z] QR Code received
+[2026-05-22T00:05:00.711Z] Connection update: undefined
+[2026-05-22T00:05:00.711Z] QR Code received
+[2026-05-22T00:05:40.718Z] Connection update: undefined
+[2026-05-22T00:05:40.718Z] QR Code received
+[2026-05-22T00:06:20.721Z] Connection update: undefined
+[2026-05-22T00:06:20.722Z] QR Code received
+[2026-05-22T00:06:31.553Z] Connection update: close
+[2026-05-22T00:06:31.553Z] Connection closed. Status: 428, Reason: Connection Terminated by Server
+[2026-05-22T00:06:31.553Z] Reconnection attempt 2/10 in 2000ms
+[2026-05-22T00:06:33.566Z] Connection update: connecting
+[2026-05-22T00:06:34.272Z] Connection update: undefined
+[2026-05-22T00:06:34.272Z] QR Code received
+[2026-05-22T00:07:14.277Z] Connection update: undefined
+[2026-05-22T00:07:14.277Z] QR Code received
+[2026-05-22T00:07:54.284Z] Connection update: undefined
+[2026-05-22T00:07:54.284Z] QR Code received
+[2026-05-22T00:08:34.290Z] Connection update: undefined
+[2026-05-22T00:08:34.291Z] QR Code received
+[2026-05-22T00:09:14.298Z] Connection update: undefined
+[2026-05-22T00:09:14.298Z] QR Code received
+[2026-05-22T00:09:54.303Z] Connection update: undefined
+[2026-05-22T00:09:54.303Z] QR Code received
+[2026-05-22T00:10:05.120Z] Connection update: close
+[2026-05-22T00:10:05.120Z] Connection closed. Status: 428, Reason: Connection Terminated by Server
+[2026-05-22T00:10:05.120Z] Reconnection attempt 3/10 in 4000ms
+[2026-05-22T00:10:09.135Z] Connection update: connecting
+[2026-05-22T00:10:09.930Z] Connection update: undefined
+[2026-05-22T00:10:09.930Z] QR Code received
+[2026-05-22T00:10:49.937Z] Connection update: undefined
+[2026-05-22T00:10:49.937Z] QR Code received
+[2026-05-22T00:11:29.944Z] Connection update: undefined
+[2026-05-22T00:11:29.949Z] QR Code received
+[2026-05-22T00:12:09.954Z] Connection update: undefined
+[2026-05-22T00:12:09.954Z] QR Code received
+[2026-05-22T00:12:49.960Z] Connection update: undefined
+[2026-05-22T00:12:49.960Z] QR Code received
+[2026-05-22T00:13:29.967Z] Connection update: undefined
+[2026-05-22T00:13:29.967Z] QR Code received
+[2026-05-22T00:13:40.775Z] Connection update: close
+[2026-05-22T00:13:40.776Z] Connection closed. Status: 428, Reason: Connection Terminated by Server
+[2026-05-22T00:13:40.776Z] Reconnection attempt 4/10 in 8000ms
+[2026-05-22T00:13:48.786Z] Connection update: connecting
+[2026-05-22T00:13:49.019Z] Connection update: undefined
+[2026-05-22T00:13:49.019Z] QR Code received
+[2026-05-22T00:14:29.024Z] Connection update: undefined
+[2026-05-22T00:14:29.024Z] QR Code received
+[2026-05-22T00:15:09.031Z] Connection update: undefined
+[2026-05-22T00:15:09.031Z] QR Code received
+[2026-05-22T00:15:49.028Z] Connection update: undefined
+[2026-05-22T00:15:49.028Z] QR Code received
+[2026-05-22T00:16:29.026Z] Connection update: undefined
+[2026-05-22T00:16:29.027Z] QR Code received
+[2026-05-22T00:17:09.032Z] Connection update: undefined
+[2026-05-22T00:17:09.032Z] QR Code received
+[2026-05-22T00:17:19.888Z] Connection update: close
+[2026-05-22T00:17:19.888Z] Connection closed. Status: 428, Reason: Connection Terminated by Server
+[2026-05-22T00:17:19.888Z] Reconnection attempt 5/10 in 16000ms
+[2026-05-22T00:17:35.902Z] Connection update: connecting
+[2026-05-22T00:17:36.154Z] Connection update: undefined
+[2026-05-22T00:17:36.154Z] QR Code received

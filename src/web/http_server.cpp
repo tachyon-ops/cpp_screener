@@ -8,6 +8,7 @@
 #include "trader/screens/screen_g.hpp"
 #include "trader/screens/screen_c.hpp"
 #include "trader/storage/time_series_store.hpp"
+#include "trader/storage/token_store.hpp"
 #include <crow.h>
 #include <nlohmann/json.hpp>
 #include <iostream>
@@ -713,6 +714,120 @@ HttpServer::HttpServer(
             }
             nlohmann::json res = {{"status", "success"}};
             return crow::response(200, res.dump());
+        } catch (const std::exception& e) {
+            nlohmann::json err = {{"error", e.what()}};
+            return crow::response(500, err.dump());
+        }
+    });
+
+    // GET /api/settings/saxo_token
+    CROW_ROUTE(pimpl_->app, "/api/settings/saxo_token")([this]() {
+        try {
+            std::string db_path = "./data/tokens.db";
+            std::string encryption_key = "c55f7b0566a4b5f6a2406d8d7b3a9242dda2e55ec3d136892a4d9950a908b4cc";
+            const char* env_key = std::getenv("TOKEN_ENCRYPTION_KEY");
+            if (env_key) {
+                encryption_key = env_key;
+            }
+
+            trader::storage::TokenStore token_store(db_path, encryption_key);
+            auto tokens_opt = token_store.load("default");
+
+            nlohmann::json res;
+            if (tokens_opt) {
+                res["configured"] = true;
+                res["openApiBase"] = tokens_opt->open_api_base;
+                res["authBase"] = tokens_opt->auth_base;
+                res["redirectUrl"] = tokens_opt->redirect_url;
+                res["tokenExpiry"] = tokens_opt->token_expiry;
+                
+                auto mask_str = [](const std::string& s) {
+                    if (s.empty()) return std::string("");
+                    if (s.length() <= 8) return std::string("••••••••");
+                    return s.substr(0, 4) + "••••" + s.substr(s.length() - 4);
+                };
+                res["appKey"] = mask_str(tokens_opt->app_key);
+                res["appSecret"] = mask_str(tokens_opt->app_secret);
+                res["accessToken"] = mask_str(tokens_opt->access_token);
+                res["refreshToken"] = mask_str(tokens_opt->refresh_token);
+                res["isAuthenticated"] = pimpl_->broker ? pimpl_->broker->is_authenticated() : false;
+            } else {
+                res["configured"] = false;
+                res["isAuthenticated"] = false;
+                res["openApiBase"] = "https://gateway.saxobank.com/sim/openapi";
+                res["authBase"] = "https://sim.authenticator.saxobank.com/oauth2";
+                res["redirectUrl"] = "http://localhost:8080/auth/saxo/callback";
+                res["tokenExpiry"] = 0;
+                res["appKey"] = "";
+                res["appSecret"] = "";
+                res["accessToken"] = "";
+                res["refreshToken"] = "";
+            }
+            return crow::response(200, res.dump());
+        } catch (const std::exception& e) {
+            nlohmann::json err = {{"error", e.what()}};
+            return crow::response(500, err.dump());
+        }
+    });
+
+    // POST /api/settings/saxo_token
+    CROW_ROUTE(pimpl_->app, "/api/settings/saxo_token").methods(crow::HTTPMethod::POST)([this](const crow::request& req) {
+        try {
+            auto body = nlohmann::json::parse(req.body);
+            
+            std::string db_path = "./data/tokens.db";
+            std::string encryption_key = "c55f7b0566a4b5f6a2406d8d7b3a9242dda2e55ec3d136892a4d9950a908b4cc";
+            const char* env_key = std::getenv("TOKEN_ENCRYPTION_KEY");
+            if (env_key) {
+                encryption_key = env_key;
+            }
+
+            trader::storage::TokenStore token_store(db_path, encryption_key);
+            auto existing_opt = token_store.load("default");
+            
+            trader::storage::SaxoTokens tokens;
+            if (existing_opt) {
+                tokens = *existing_opt;
+            }
+            
+            auto update_field = [](const std::string& new_val, std::string& target) {
+                if (!new_val.empty() && new_val.find("••••") == std::string::npos) {
+                    target = new_val;
+                }
+            };
+
+            if (body.contains("openApiBase")) tokens.open_api_base = body["openApiBase"].get<std::string>();
+            if (body.contains("authBase")) tokens.auth_base = body["authBase"].get<std::string>();
+            if (body.contains("redirectUrl")) tokens.redirect_url = body["redirectUrl"].get<std::string>();
+            if (body.contains("tokenExpiry")) tokens.token_expiry = body["tokenExpiry"].get<uint64_t>();
+
+            if (body.contains("appKey")) update_field(body["appKey"].get<std::string>(), tokens.app_key);
+            if (body.contains("appSecret")) update_field(body["appSecret"].get<std::string>(), tokens.app_secret);
+            if (body.contains("accessToken")) update_field(body["accessToken"].get<std::string>(), tokens.access_token);
+            if (body.contains("refreshToken")) update_field(body["refreshToken"].get<std::string>(), tokens.refresh_token);
+
+            if (token_store.save("default", tokens)) {
+                bool is_auth = false;
+                std::string warn_msg = "";
+                if (pimpl_->broker) {
+                    auto auth_res = pimpl_->broker->authenticate();
+                    is_auth = auth_res.is_ok();
+                    if (!auth_res.is_ok()) {
+                        warn_msg = auth_res.error();
+                    }
+                }
+                
+                nlohmann::json res;
+                res["status"] = "success";
+                res["isAuthenticated"] = is_auth;
+                if (!warn_msg.empty()) {
+                    res["warning"] = "Tokens saved, but authentication failed: " + warn_msg;
+                }
+                return crow::response(200, res.dump());
+            } else {
+                nlohmann::json err = {{"error", "Failed to encrypt and save tokens"}};
+                return crow::response(500, err.dump());
+            }
         } catch (const std::exception& e) {
             nlohmann::json err = {{"error", e.what()}};
             return crow::response(500, err.dump());

@@ -57,6 +57,11 @@ public:
     void load_config(const std::string& path);
 
 private:
+    bool calculate_pair_divergence(
+        const std::string& symbol_a, const std::string& symbol_b, 
+        double& zscore_out, double& corr_out, 
+        double& ret_a_out, double& ret_b_out, double& spread_out) const;
+
     std::shared_ptr<persistence::SQLiteStore> store_;
     std::shared_ptr<storage::TimeSeriesStore> ts_store_;
     std::shared_ptr<core::AlertDispatcher> dispatcher_;

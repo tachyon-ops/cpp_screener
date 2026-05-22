@@ -53,13 +53,15 @@ void ScreenG::load_config(const std::string& path) {
     };
 
     while (std::getline(infile, line)) {
+        if (line.empty()) continue;
+        bool starts_with_whitespace = (line.front() == ' ' || line.front() == '\t');
         trim(line);
         if (line.empty() || line[0] == '#') continue;
 
         if (line.rfind("screen_g:", 0) == 0) {
             in_screen_g = true;
             continue;
-        } else if (line.find(":") != std::string::npos && line.front() != ' ' && line.front() != '\t' && line.rfind("screen_g", 0) != 0 && line.rfind("screen_c", 0) != 0) {
+        } else if (line.find(":") != std::string::npos && !starts_with_whitespace && line.rfind("screen_g", 0) != 0 && line.rfind("screen_c", 0) != 0) {
             in_screen_g = false;
         }
 
@@ -137,7 +139,7 @@ bool ScreenG::calculate_pair_divergence(
     if (ts_store_) {
         auto ts_a = ts_store_->get(symbol_a);
         if (ts_a) {
-            auto ts_bars = ts_a->last_n(Resolution::D1, 150);
+            auto ts_bars = ts_a->last_n(broker::Resolution::D1, 150);
             for (const auto& b : ts_bars) {
                 std::string dt = ms_to_date_str(b.ts.ms_since_epoch);
                 if (std::find_if(pbars_a.begin(), pbars_a.end(), [&](const PriceBar& x) { return x.date == dt; }) == pbars_a.end()) {
@@ -147,7 +149,7 @@ bool ScreenG::calculate_pair_divergence(
         }
         auto ts_b = ts_store_->get(symbol_b);
         if (ts_b) {
-            auto ts_bars = ts_b->last_n(Resolution::D1, 150);
+            auto ts_bars = ts_b->last_n(broker::Resolution::D1, 150);
             for (const auto& b : ts_bars) {
                 std::string dt = ms_to_date_str(b.ts.ms_since_epoch);
                 if (std::find_if(pbars_b.begin(), pbars_b.end(), [&](const PriceBar& x) { return x.date == dt; }) == pbars_b.end()) {
@@ -340,7 +342,7 @@ void ScreenG::evaluate(const std::string& date) {
                     alert.confluence_factors.push_back("Spread: " + std::to_string(spread).substr(0, 7));
 
                     alert.conviction_score = std::abs(zscore);
-                    alert.notes = "Divergence detected: " + pair.symbol_a + " (daily ret " + std::to_string(ret_a * 100.0).substr(0, 4) + "%) vs " 
+                    alert.news_summary = "Divergence detected: " + pair.symbol_a + " (daily ret " + std::to_string(ret_a * 100.0).substr(0, 4) + "%) vs " 
                                   + pair.symbol_b + " (daily ret " + std::to_string(ret_b * 100.0).substr(0, 4) + "%). Spread Z-score = " 
                                   + std::to_string(zscore).substr(0, 5) + ", Pearson = " + std::to_string(corr).substr(0, 5);
 

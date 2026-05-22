@@ -155,8 +155,6 @@ void PositionManager::check_positions() {
         }
 
         if (stopped_out) {
-            pos.status = (pos.current_stop == entry) ? "closed_be" : 
-                         ((pos.direction == "long" && pos.current_stop > entry) || (pos.direction == "short" && pos.current_stop < entry)) ? "closed_winner" : "closed_loser";
             pos.exit_price = latest_price;
             pos.exit_ts = get_current_utc_time_str();
             pos.exit_reason = "trail_stop_hit";
@@ -168,6 +166,10 @@ void PositionManager::check_positions() {
                 R = (entry - pos.exit_price) / r_size;
             }
             pos.r_realized = R;
+            
+            // Determine status based on actual realized R
+            pos.status = (R == 0.0) ? "closed_be" : (R > 0.0) ? "closed_winner" : "closed_loser";
+            
             pos.notes += " [Stopped out at " + std::to_string(latest_price) + " R=" + std::to_string(R).substr(0, 4) + "]";
             
             store_->update_position(pos);

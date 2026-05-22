@@ -180,58 +180,71 @@ void ScreenE::evaluate(const std::string& date) {
 
             // Dispatch alert if dispatcher is available
             if (dispatcher_) {
-                core::Alert alert;
-                
                 auto now = std::chrono::system_clock::now();
-                auto time_t_now = std::chrono::system_clock::to_time_t(now);
-                std::stringstream ts_ss;
-                ts_ss << std::put_time(std::gmtime(&time_t_now), "%Y-%m-%dT%H:%M:%SZ");
-
-                alert.ts = ts_ss.str();
-                alert.screen = "E";
-                alert.tier = setup_tier;
-                alert.instrument_id = inst.id;
-                alert.symbol = symbol;
-
-                std::string regime_str = "Chop";
-                auto logs = store_->get_regime_log(1);
-                if (!logs.empty()) {
-                    regime_str = logs[0].regime;
+                
+                // Check 24-hour cooldown for alert dispatch
+                bool allowed = false;
+                {
+                    std::lock_guard<std::mutex> lock(cooldowns_mutex_);
+                    auto it = cooldowns_.find(symbol);
+                    if (it == cooldowns_.end() || now >= it->second) {
+                        cooldowns_[symbol] = now + std::chrono::hours(24);
+                        allowed = true;
+                    }
                 }
-                alert.regime_at_alert = regime_str;
 
-                alert.suggested_entry_low = current_price;
-                alert.suggested_entry_high = current_price;
-                
-                // Suggested stop is 10% below current price
-                alert.suggested_stop = current_price * 0.90;
-                
-                // Suggested target is mean-reversion to historical discount
-                // Price at mean discount = NAV * (1 - mean_discount)
-                double price_at_mean = current_nav * (1.0 - mean_discount);
-                alert.target_1 = price_at_mean;
-                alert.target_2 = price_at_mean * 1.10;
-                alert.target_3 = price_at_mean * 1.20;
-                alert.rr_to_target_1 = (price_at_mean - current_price) / (current_price - alert.suggested_stop);
+                if (allowed) {
+                    core::Alert alert;
+                    auto time_t_now = std::chrono::system_clock::to_time_t(now);
+                    std::stringstream ts_ss;
+                    ts_ss << std::put_time(std::gmtime(&time_t_now), "%Y-%m-%dT%H:%M:%SZ");
 
-                alert.confluence_factors.push_back("Discount deviation: " + std::to_string(discount_sigma) + " sigma");
-                alert.confluence_factors.push_back("Current discount: " + std::to_string(current_discount * 100.0) + "%");
-                alert.confluence_factors.push_back("Leverage ratio: " + std::to_string(leverage_ratio * 100.0) + "%");
-                alert.confluence_factors.push_back("50d Avg Dollar Vol: $" + std::to_string(avg_dollar_volume / 1000.0) + "k");
+                    alert.ts = ts_ss.str();
+                    alert.screen = "E";
+                    alert.tier = setup_tier;
+                    alert.instrument_id = inst.id;
+                    alert.symbol = symbol;
 
-                alert.news_summary = "Closed-end fund trades at extreme historical discount. Leverage: " + std::to_string((int)(leverage_ratio * 100)) + "%.";
+                    std::string regime_str = "Chop";
+                    auto logs = store_->get_regime_log(1);
+                    if (!logs.empty()) {
+                        regime_str = logs[0].regime;
+                    }
+                    alert.regime_at_alert = regime_str;
 
-                alert.extra["nav"] = current_nav;
-                alert.extra["discount"] = current_discount;
-                alert.extra["mean_discount"] = mean_discount;
-                alert.extra["stddev_discount"] = stddev_discount;
-                alert.extra["discount_sigma"] = discount_sigma;
-                alert.extra["leverage_ratio"] = leverage_ratio;
-                alert.extra["avg_dollar_volume"] = avg_dollar_volume;
+                    alert.suggested_entry_low = current_price;
+                    alert.suggested_entry_high = current_price;
+                    
+                    // Suggested stop is 10% below current price
+                    alert.suggested_stop = current_price * 0.90;
+                    
+                    // Suggested target is mean-reversion to historical discount
+                    // Price at mean discount = NAV * (1 - mean_discount)
+                    double price_at_mean = current_nav * (1.0 - mean_discount);
+                    alert.target_1 = price_at_mean;
+                    alert.target_2 = price_at_mean * 1.10;
+                    alert.target_3 = price_at_mean * 1.20;
+                    alert.rr_to_target_1 = (price_at_mean - current_price) / (current_price - alert.suggested_stop);
 
-                alert.conviction_score = discount_sigma;
+                    alert.confluence_factors.push_back("Discount deviation: " + std::to_string(discount_sigma) + " sigma");
+                    alert.confluence_factors.push_back("Current discount: " + std::to_string(current_discount * 100.0) + "%");
+                    alert.confluence_factors.push_back("Leverage ratio: " + std::to_string(leverage_ratio * 100.0) + "%");
+                    alert.confluence_factors.push_back("50d Avg Dollar Vol: $" + std::to_string(avg_dollar_volume / 1000.0) + "k");
 
-                dispatcher_->dispatch(alert);
+                    alert.news_summary = "Closed-end fund trades at extreme historical discount. Leverage: " + std::to_string((int)(leverage_ratio * 100)) + "%.";
+
+                    alert.extra["nav"] = current_nav;
+                    alert.extra["discount"] = current_discount;
+                    alert.extra["mean_discount"] = mean_discount;
+                    alert.extra["stddev_discount"] = stddev_discount;
+                    alert.extra["discount_sigma"] = discount_sigma;
+                    alert.extra["leverage_ratio"] = leverage_ratio;
+                    alert.extra["avg_dollar_volume"] = avg_dollar_volume;
+
+                    alert.conviction_score = discount_sigma;
+
+                    dispatcher_->dispatch(alert);
+                }
             }
         }
     }

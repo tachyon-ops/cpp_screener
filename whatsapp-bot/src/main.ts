@@ -1,5 +1,6 @@
 import { createBot, createProvider, createFlow, addKeyword, MemoryDB } from '@builderbot/bot';
 import { BaileysProvider } from '@builderbot/provider-baileys';
+import { fetchLatestBaileysVersion } from 'baileys';
 import { WebSocket } from 'ws';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -299,8 +300,17 @@ function connectWebSocket(botInstance: any, provider: any) {
 
 // Main execution block
 const main = async () => {
+    let version: [number, number, number] = [2, 3000, 1035194821];
+    try {
+        const { version: latestVersion, isLatest } = await fetchLatestBaileysVersion();
+        console.log(`[Bot] Fetched latest Baileys WhatsApp Web version: ${latestVersion.join('.')}. Is latest: ${isLatest}`);
+        version = latestVersion as [number, number, number];
+    } catch (e: any) {
+        console.error(`[Bot] Failed to fetch latest Baileys version, using fallback:`, e.message);
+    }
+
     const adapterFlow = createFlow([helpFlow, regimeFlow, candidatesFlow, alertsFlow, actFlow, skipFlow]);
-    const adapterProvider = createProvider(BaileysProvider);
+    const adapterProvider = createProvider(BaileysProvider, { version });
     const adapterDB = new MemoryDB();
 
     console.log('[Bot] Starting BuilderBot service...');

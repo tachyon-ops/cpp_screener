@@ -49,13 +49,15 @@ void ScreenC::load_config(const std::string& path) {
     };
 
     while (std::getline(infile, line)) {
+        if (line.empty()) continue;
+        bool starts_with_whitespace = (line.front() == ' ' || line.front() == '\t');
         trim(line);
         if (line.empty() || line[0] == '#') continue;
 
         if (line.rfind("screen_c:", 0) == 0) {
             in_screen_c = true;
             continue;
-        } else if (line.find(":") != std::string::npos && line.front() != ' ' && line.front() != '\t' && line.rfind("screen_c", 0) != 0 && line.rfind("screen_g", 0) != 0) {
+        } else if (line.find(":") != std::string::npos && !starts_with_whitespace && line.rfind("screen_c", 0) != 0 && line.rfind("screen_g", 0) != 0) {
             in_screen_c = false;
         }
 
@@ -91,13 +93,13 @@ bool ScreenC::is_watching(const std::string& symbol) const {
     std::lock_guard<std::mutex> lock(watch_mutex_);
     auto it = watch_list_.find(symbol);
     if (it == watch_list_.end()) return false;
-    auto now = std::system_clock::now();
+    auto now = std::chrono::system_clock::now();
     return now < it->second;
 }
 
 void ScreenC::add_to_watch(const std::string& symbol, int duration_hours) {
     std::lock_guard<std::mutex> lock(watch_mutex_);
-    auto now = std::system_clock::now();
+    auto now = std::chrono::system_clock::now();
     watch_list_[symbol] = now + std::chrono::hours(duration_hours);
     std::cout << "[ScreenC] Added " << symbol << " to watch list for " << duration_hours << " hours." << std::endl;
 }
@@ -150,8 +152,8 @@ void ScreenC::check_symbol(const std::string& symbol, const std::string& date) {
     auto ts = ts_store_ ? ts_store_->get(symbol) : nullptr;
     if (!ts) return;
 
-    std::vector<Resolution> timeframes = {Resolution::H1, Resolution::H4, Resolution::D1};
-    for (Resolution tf : timeframes) {
+    std::vector<broker::Resolution> timeframes = {broker::Resolution::H1, broker::Resolution::H4, broker::Resolution::D1};
+    for (broker::Resolution tf : timeframes) {
         auto tf_bars = ts->last_n(tf, panic_drawdown_period_ + 5);
         if (tf_bars.size() < 21) continue;
 
@@ -251,7 +253,7 @@ void ScreenC::check_symbol(const std::string& symbol, const std::string& date) {
             res.suggested_stop = low * 0.995; // 0.5% below trigger low
             res.rr_target = 3.0;
 
-            std::string tf_str = (tf == Resolution::H1) ? "1H" : (tf == Resolution::H4) ? "4H" : "1D";
+            std::string tf_str = (tf == core::Resolution::H1) ? "1H" : (tf == core::Resolution::H4) ? "4H" : "1D";
             std::stringstream notes_ss;
             notes_ss << "Capitulation Wick Reversal on " << tf_str << ". Lower wick: " 
                      << std::fixed << std::setprecision(1) << (wick_size_pct * 100.0) << "%, Volume: " 
@@ -319,7 +321,7 @@ void ScreenC::check_symbol(const std::string& symbol, const std::string& date) {
                     }
 
                     alert.conviction_score = 4.0;
-                    alert.notes = res.notes;
+                    alert.extra["notes"] = res.notes;
 
                     dispatcher_->dispatch(alert);
                 }

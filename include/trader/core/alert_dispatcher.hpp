@@ -83,6 +83,9 @@ public:
     // Ingest a new alert from screens
     void dispatch(const Alert& alert);
 
+    // Dispatch a generic telegram message
+    void dispatch_telegram_message(const std::string& message);
+
     // Reload clusters configuration
     void reload_clusters();
 

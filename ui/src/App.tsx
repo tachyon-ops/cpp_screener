@@ -83,6 +83,28 @@ interface RotationResult {
   test_200ma: boolean;
 }
 
+interface Position {
+  id: number;
+  alert_id: number;
+  instrument_id: number;
+  symbol: string;
+  name: string;
+  direction: string;
+  entry_ts: string;
+  entry_price: number;
+  size: number;
+  initial_stop: number;
+  current_stop: number;
+  status: string;
+  exit_ts: string;
+  exit_price: number;
+  exit_reason: string;
+  r_realized: number;
+  max_favorable_excursion_r: number;
+  max_adverse_excursion_r: number;
+  notes: string;
+}
+
 const getAlertStatus = (alert: Alert) => {
   if (alert.responses && alert.responses.length > 0) {
     const statusResp = alert.responses.find(r => r.response_type !== 'noted');
@@ -127,11 +149,12 @@ const getAlertSizes = (alert: Alert) => {
 };
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'alerts' | 'candidates' | 'universe' | 'rotation' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'alerts' | 'candidates' | 'positions' | 'universe' | 'rotation' | 'settings'>('dashboard');
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [instruments, setInstruments] = useState<Instrument[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [positions, setPositions] = useState<Position[]>([]);
   const [regime, setRegime] = useState<Regime | null>(null);
   const [ticks, setTicks] = useState<Record<string, number>>({});
   const [candFilter, setCandFilter] = useState<'all' | 'active' | 'expired'>('active');
@@ -139,6 +162,24 @@ function App() {
     whatsapp_enabled: 'false',
     whatsapp_recipient: ''
   });
+
+  // Saxo OpenAPI Credentials State
+  const [saxoCreds, setSaxoCreds] = useState({
+    configured: false,
+    isAuthenticated: false,
+    openApiBase: 'https://gateway.saxobank.com/sim/openapi',
+    authBase: 'https://sim.authenticator.saxobank.com/oauth2',
+    redirectUrl: 'http://localhost:8080/auth/saxo/callback',
+    tokenExpiry: 0,
+    appKey: '',
+    appSecret: '',
+    accessToken: '',
+    refreshToken: '',
+  });
+  const [showAppKey, setShowAppKey] = useState(false);
+  const [showAppSecret, setShowAppSecret] = useState(false);
+  const [showAccessToken, setShowAccessToken] = useState(false);
+  const [showRefreshToken, setShowRefreshToken] = useState(false);
   
   // Sector Rotation State
   const [rotationData, setRotationData] = useState<RotationResult[]>([]);
@@ -158,6 +199,11 @@ function App() {
   const [selectedRiskTiers, setSelectedRiskTiers] = useState<Record<number, string>>({});
   const [activeSkipDropdown, setActiveSkipDropdown] = useState<number | null>(null);
   const [notesText, setNotesText] = useState<Record<number, string>>({});
+  
+  // Alert filtering state
+  const [alertStatusFilter, setAlertStatusFilter] = useState<'all' | 'pending' | 'seen' | 'acted' | 'skipped' | 'deferred'>('pending');
+  const [alertScreenFilter, setAlertScreenFilter] = useState<string>('all');
+  const [alertSearchQuery, setAlertSearchQuery] = useState<string>('');
 
   // Candidates creation form
   const [showCandForm, setShowCandForm] = useState(false);
@@ -172,16 +218,18 @@ function App() {
   const wsRef = useRef<WebSocket | null>(null);
 
   // Fetch initial data
-  const fetchData = async () => {
+  const fetchData = async (isSilent = false) => {
     try {
-      setLoadingRotation(true);
-      const [resRegime, resAlerts, resCandidates, resInstruments, resRotation, resSettings] = await Promise.all([
+      if (!isSilent) setLoadingRotation(true);
+      const [resRegime, resAlerts, resCandidates, resInstruments, resRotation, resSettings, resPositions, resSaxo] = await Promise.all([
         fetch('/api/regime'),
         fetch('/api/alerts'),
         fetch('/api/candidates'),
         fetch('/api/instruments'),
         fetch('/api/sector_rotation'),
-        fetch('/api/settings')
+        fetch('/api/settings'),
+        fetch('/api/positions'),
+        fetch('/api/settings/saxo_token')
       ]);
 
       if (resRegime.ok) {
@@ -195,11 +243,15 @@ function App() {
       if (resSettings.ok) {
         setSettings(await resSettings.json());
       }
+      if (resPositions.ok) setPositions(await resPositions.json());
+      if (resSaxo.ok) {
+        setSaxoCreds(await resSaxo.json());
+      }
     } catch (e) {
       console.error('Failed to fetch screener data:', e);
-      showToast('Error syncing with engine. Retrying...', 'error');
+      if (!isSilent) showToast('Error syncing with engine. Retrying...', 'error');
     } finally {
-      setLoadingRotation(false);
+      if (!isSilent) setLoadingRotation(false);
     }
   };
 
@@ -207,6 +259,11 @@ function App() {
     // Add dark mode class globally to match neon-noir styles
     document.documentElement.classList.add('dark');
     fetchData();
+
+    // Set up 5-second polling interval for real-time stop updates
+    const interval = setInterval(() => {
+      fetchData(true);
+    }, 5000);
 
     // Setup WebSocket
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -251,6 +308,7 @@ function App() {
 
     return () => {
       if (wsRef.current) wsRef.current.close();
+      clearInterval(interval);
     };
   }, []);
 
@@ -486,11 +544,12 @@ function App() {
 
           {/* Navigation Links */}
           <nav className="flex-1 px-3 py-4 space-y-1">
-            {(['dashboard', 'alerts', 'candidates', 'universe', 'rotation', 'settings'] as const).map((tab) => {
+            {(['dashboard', 'alerts', 'candidates', 'positions', 'universe', 'rotation', 'settings'] as const).map((tab) => {
               const tabMeta = {
                 dashboard: { label: 'Dashboard', icon: '📊' },
                 alerts: { label: 'Screener Alerts', icon: '🚨' },
                 candidates: { label: 'Swing Watchlist', icon: '🎯' },
+                positions: { label: 'Positions Tracker', icon: '💼' },
                 universe: { label: 'Instrument Universe', icon: '🌌' },
                 rotation: { label: 'Sector Heatmap', icon: '📈' },
                 settings: { label: 'Settings', icon: '⚙️' }
@@ -542,7 +601,7 @@ function App() {
         {/* Top bar header */}
         <header className="h-14 px-6 border-b border-white/5 flex items-center justify-between bg-[#090b11]/50 backdrop-blur-md">
             <span className="text-xs text-white font-bold uppercase tracking-widest bg-white/5 border border-white/5 px-2.5 py-1 rounded-md">
-              {activeTab === 'rotation' ? 'Sector Heatmap' : activeTab === 'candidates' ? 'Swing Watchlist' : activeTab === 'universe' ? 'Instrument Universe' : activeTab === 'settings' ? 'Settings' : activeTab}
+              {activeTab === 'rotation' ? 'Sector Heatmap' : activeTab === 'candidates' ? 'Swing Watchlist' : activeTab === 'positions' ? 'Positions Tracker' : activeTab === 'universe' ? 'Instrument Universe' : activeTab === 'settings' ? 'Settings' : activeTab}
             </span>
 
           {/* Quick Regime status banner directly in header */}
@@ -647,6 +706,10 @@ function App() {
                               ? 'bg-violet-500/10 border-violet-500/20 text-violet-400'
                               : alert.screen === 'F'
                               ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                              : alert.screen === 'G'
+                              ? 'bg-fuchsia-500/10 border-fuchsia-500/20 text-fuchsia-400'
+                              : alert.screen === 'C'
+                              ? 'bg-rose-500/10 border-rose-500/20 text-rose-400'
                               : 'bg-[#ff6d5a]/10 border-[#ff6d5a]/20 text-[#ff6d5a]'
                           }`}>
                             Screen {alert.screen}
@@ -802,12 +865,93 @@ function App() {
             "Other"
           ];
 
+          const filteredAlerts = alerts.filter(alert => {
+            // Status filter
+            const status = getAlertStatus(alert);
+            if (alertStatusFilter !== 'all') {
+              if (alertStatusFilter === 'acted') {
+                if (status !== 'acted' && status !== 'execute') return false;
+              } else {
+                if (status !== alertStatusFilter) return false;
+              }
+            }
+
+            // Screen filter
+            if (alertScreenFilter !== 'all') {
+              if (alert.screen !== alertScreenFilter) return false;
+            }
+
+            // Search query filter
+            if (alertSearchQuery) {
+              const query = alertSearchQuery.toLowerCase().trim();
+              const symbol = (alert.payload.symbol || (alert as any).symbol || '').toLowerCase();
+              const trigger = (alert.payload.trigger || '').toLowerCase();
+              if (!symbol.includes(query) && !trigger.includes(query)) return false;
+            }
+
+            return true;
+          });
+
           return (
             <div className="space-y-6 animate-fade-in text-left">
               <div className="flex justify-between items-center">
                 <div>
                   <h2 className="text-2xl font-bold text-white tracking-tight">Market Screener Alerts</h2>
                   <p className="text-xs text-gray-400 mt-1">Real-time alerts generated across active algorithmic screens.</p>
+                </div>
+              </div>
+
+              {/* Filter Control Bar */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/5 border border-white/5 p-4 rounded-xl">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1.5">Status Filter</span>
+                    <div className="flex bg-black/50 p-0.5 rounded-lg border border-white/10">
+                      {(['pending', 'seen', 'acted', 'skipped', 'deferred', 'all'] as const).map((filterOpt) => (
+                        <button
+                          key={filterOpt}
+                          type="button"
+                          onClick={() => setAlertStatusFilter(filterOpt)}
+                          className={`px-3 py-1.5 rounded-md text-[10px] uppercase font-bold tracking-wider transition ${
+                            alertStatusFilter === filterOpt
+                              ? 'bg-white/10 text-white shadow-sm'
+                              : 'text-gray-400 hover:text-white'
+                          }`}
+                        >
+                          {filterOpt === 'acted' ? 'Acted' : filterOpt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1.5">Screener Source</span>
+                    <select
+                      value={alertScreenFilter}
+                      onChange={(e) => setAlertScreenFilter(e.target.value)}
+                      className="bg-black/50 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-white/20 h-[30px]"
+                    >
+                      <option value="all">All Screens</option>
+                      <option value="A">Screen A (Gap Down)</option>
+                      <option value="B">Screen B (Mean Reversion)</option>
+                      <option value="D">Screen D (Industry Rotation)</option>
+                      <option value="E">Screen E (CEF Discount)</option>
+                      <option value="F">Screen F (Darvas Box Breakout)</option>
+                      <option value="G">Screen G (Pairs Trading Divergence)</option>
+                      <option value="C">Screen C (Capitulation Wick)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex flex-col w-full md:w-auto">
+                  <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1.5">Search Query</span>
+                  <input
+                    type="text"
+                    placeholder="Search symbol or message..."
+                    value={alertSearchQuery}
+                    onChange={(e) => setAlertSearchQuery(e.target.value)}
+                    className="bg-black/50 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-white/20 w-full md:w-64 h-[30px]"
+                  />
                 </div>
               </div>
 
@@ -841,7 +985,7 @@ function App() {
 
               {/* Alerts Cards List/Grid */}
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                {alerts.map((alert) => {
+                {filteredAlerts.map((alert) => {
                   const sizes = getAlertSizes(alert);
                   const status = getAlertStatus(alert);
                   const selectedTier = selectedRiskTiers[alert.id];
@@ -862,6 +1006,10 @@ function App() {
                                 ? 'bg-violet-500/10 border-violet-500/20 text-violet-400'
                                 : alert.screen === 'F'
                                 ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                                : alert.screen === 'G'
+                                ? 'bg-fuchsia-500/10 border-fuchsia-500/20 text-fuchsia-400'
+                                : alert.screen === 'C'
+                                ? 'bg-rose-500/10 border-rose-500/20 text-rose-400'
                                 : 'bg-[#ff6d5a]/10 border-[#ff6d5a]/20 text-[#ff6d5a]'
                             }`}>
                               Screen {alert.screen}
@@ -959,6 +1107,18 @@ function App() {
                               } else if (key === 'sector_above_ma200') {
                                 displayKey = 'Sector Trend';
                                 displayVal = val > 0 ? 'Yes (Above 200MA)' : 'No (Below 200MA)';
+                              } else if (key === 'pearson_corr') {
+                                displayKey = 'Pearson Corr';
+                                displayVal = typeof val === 'number' ? val.toFixed(4) : displayVal;
+                              } else if (key === 'spread_zscore') {
+                                displayKey = 'Spread Z-score';
+                                displayVal = typeof val === 'number' ? val.toFixed(2) : displayVal;
+                              } else if (key === 'wick_size_pct') {
+                                displayKey = 'Wick Size';
+                                displayVal = typeof val === 'number' ? `${(val * 100).toFixed(1)}%` : displayVal;
+                              } else if (key === 'pierced_support') {
+                                displayKey = 'Pierced Support';
+                                displayVal = typeof val === 'number' ? `$${val.toFixed(2)}` : displayVal;
                               }
                               
                               return (
@@ -1196,9 +1356,11 @@ function App() {
                   );
                 })}
 
-                {alerts.length === 0 && (
+                {filteredAlerts.length === 0 && (
                   <div className="glass border border-white/5 p-12 rounded-xl text-center text-gray-500 text-sm col-span-full">
-                    No alerts generated yet. Waiting for market price ticks...
+                    {alerts.length === 0 
+                      ? "No alerts generated yet. Waiting for market price ticks..." 
+                      : "No alerts match the current filters."}
                   </div>
                 )}
               </div>
@@ -1644,7 +1806,7 @@ function App() {
               </div>
               <div className="flex gap-2">
                 <button
-                  onClick={fetchData}
+                  onClick={() => fetchData()}
                   disabled={loadingRotation}
                   className="bg-white/5 hover:bg-white/10 text-white border border-white/10 text-xs font-semibold rounded-lg px-4 py-2 transition flex items-center gap-1 disabled:opacity-50"
                 >
@@ -1919,6 +2081,203 @@ function App() {
           </div>
         )}
 
+        {/* Positions Tracker Tab */}
+        {activeTab === 'positions' && (() => {
+          const activePositions = positions.filter(p => p.status === 'open');
+          const closedPositions = positions.filter(p => p.status !== 'open');
+
+          return (
+            <div className="space-y-6 animate-fade-in text-left">
+              <div>
+                <h2 className="text-2xl font-bold text-white tracking-tight">Positions Tracker</h2>
+                <p className="text-xs text-gray-400 mt-1">Real-time status of executed setups, active stops, and realized performance.</p>
+              </div>
+
+              {/* Stats Bar */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="glass border border-white/5 p-4 rounded-xl">
+                  <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Active Trades</div>
+                  <div className="text-2xl font-bold text-emerald-400 mt-1 font-mono">{activePositions.length}</div>
+                  <div className="text-[9px] text-gray-500 mt-0.5">Currently open in DB</div>
+                </div>
+                <div className="glass border border-white/5 p-4 rounded-xl">
+                  <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Closed Trades</div>
+                  <div className="text-2xl font-bold text-gray-400 mt-1 font-mono">{closedPositions.length}</div>
+                  <div className="text-[9px] text-gray-500 mt-0.5">Completed trade history</div>
+                </div>
+                <div className="glass border border-white/5 p-4 rounded-xl">
+                  <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Total Realized R</div>
+                  <div className="text-2xl font-bold text-sky-400 mt-1 font-mono">
+                    {closedPositions.length > 0
+                      ? `${closedPositions.reduce((acc, p) => acc + (p.r_realized || 0), 0).toFixed(2)}R`
+                      : '0.00R'
+                    }
+                  </div>
+                  <div className="text-[9px] text-gray-500 mt-0.5">Net profitability factor</div>
+                </div>
+                <div className="glass border border-white/5 p-4 rounded-xl">
+                  <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Win Rate</div>
+                  <div className="text-2xl font-bold text-[#ff6d5a] mt-1 font-mono">
+                    {closedPositions.length > 0
+                      ? `${((closedPositions.filter(p => (p.r_realized || 0) > 0).length / closedPositions.length) * 100).toFixed(0)}%`
+                      : 'N/A'
+                    }
+                  </div>
+                  <div className="text-[9px] text-gray-500 mt-0.5">Trades with positive R</div>
+                </div>
+              </div>
+
+              {/* Active Positions Table */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Active Positions</h3>
+                <div className="glass border border-white/5 rounded-xl overflow-hidden">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-white/5 bg-white/5 text-gray-400 font-bold uppercase tracking-wider">
+                        <th className="p-4">ID</th>
+                        <th className="p-4">Symbol</th>
+                        <th className="p-4">Direction</th>
+                        <th className="p-4">Size</th>
+                        <th className="p-4">Entry Price</th>
+                        <th className="p-4">Current Price</th>
+                        <th className="p-4">Stop Loss</th>
+                        <th className="p-4">Current R</th>
+                        <th className="p-4">Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5 font-mono text-gray-300">
+                      {activePositions.map((pos) => {
+                        const currentPrice = ticks[pos.symbol] !== undefined ? ticks[pos.symbol] : pos.entry_price;
+                        const rSize = pos.direction === 'short' ? (pos.initial_stop - pos.entry_price) : (pos.entry_price - pos.initial_stop);
+                        const currentR = rSize > 0 ? (pos.direction === 'short' ? (pos.entry_price - currentPrice) / rSize : (currentPrice - pos.entry_price) / rSize) : 0;
+                        const rClass = currentR >= 0 ? 'text-emerald-400' : 'text-rose-400';
+                        const dirClass = pos.direction === 'short' 
+                          ? 'bg-rose-500/10 border-rose-500/20 text-rose-400' 
+                          : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400';
+
+                        return (
+                          <tr key={pos.id} className="hover:bg-white/5 transition">
+                            <td className="p-4 text-gray-500">#{pos.id}</td>
+                            <td className="p-4">
+                              <span className="font-bold text-white">{pos.symbol}</span>
+                              <div className="text-[10px] text-gray-500 font-sans truncate max-w-[150px]">{pos.name}</div>
+                            </td>
+                            <td className="p-4">
+                              <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold border ${dirClass}`}>
+                                {pos.direction}
+                              </span>
+                            </td>
+                            <td className="p-4">{pos.size}</td>
+                            <td className="p-4">${pos.entry_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="p-4 font-bold text-white">${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="p-4">
+                              <div className="flex items-center gap-1.5 font-sans">
+                                <span className="font-mono">${pos.current_stop.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                {pos.current_stop === pos.entry_price && (
+                                  <span className="px-1.5 py-0.5 rounded text-[8px] bg-purple-500/20 text-purple-300 border border-purple-500/20 font-bold">BE</span>
+                                )}
+                                {pos.current_stop !== pos.initial_stop && pos.current_stop !== pos.entry_price && (
+                                  <span className="px-1.5 py-0.5 rounded text-[8px] bg-sky-500/20 text-sky-300 border border-sky-500/20 font-bold">TRAILED</span>
+                                )}
+                              </div>
+                              <div className="text-[9px] text-gray-500">Init: ${pos.initial_stop.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                            </td>
+                            <td className={`p-4 font-bold ${rClass}`}>
+                              {currentR >= 0 ? '+' : ''}{currentR.toFixed(2)}R
+                            </td>
+                            <td className="p-4 text-gray-400 font-sans text-xs truncate max-w-xs" title={pos.notes}>
+                              {pos.notes}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {activePositions.length === 0 && (
+                        <tr>
+                          <td colSpan={9} className="p-8 text-center text-gray-500 font-sans text-xs">
+                            No active positions currently tracked.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Closed Positions History Table */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Closed Positions History</h3>
+                <div className="glass border border-white/5 rounded-xl overflow-hidden">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-white/5 bg-white/5 text-gray-400 font-bold uppercase tracking-wider">
+                        <th className="p-4">ID</th>
+                        <th className="p-4">Symbol</th>
+                        <th className="p-4">Direction</th>
+                        <th className="p-4">Entry / Exit Price</th>
+                        <th className="p-4">Realized R</th>
+                        <th className="p-4">Exit Reason</th>
+                        <th className="p-4">Exit Time</th>
+                        <th className="p-4">Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5 font-mono text-gray-300">
+                      {closedPositions.map((pos) => {
+                        const rRealized = pos.r_realized;
+                        const rClass = rRealized >= 0 ? 'text-emerald-400' : 'text-rose-400';
+                        const dirClass = pos.direction === 'short' 
+                          ? 'bg-rose-500/10 border-rose-500/20 text-rose-400' 
+                          : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400';
+
+                        let reasonLabel = pos.exit_reason;
+                        if (pos.exit_reason === 'trail_stop_hit') reasonLabel = '🛑 Trail Stop Hit';
+                        else if (pos.exit_reason === 'target_hit') reasonLabel = '🎯 Target Hit';
+                        else if (pos.exit_reason === 'time_stop') reasonLabel = '⏳ Time Stop';
+                        else if (pos.exit_reason === 'manual_close') reasonLabel = '✋ Manual Close';
+
+                        return (
+                          <tr key={pos.id} className="hover:bg-white/5 transition">
+                            <td className="p-4 text-gray-500">#{pos.id}</td>
+                            <td className="p-4">
+                              <span className="font-bold text-white">{pos.symbol}</span>
+                              <div className="text-[10px] text-gray-500 font-sans truncate max-w-[150px]">{pos.name}</div>
+                            </td>
+                            <td className="p-4">
+                              <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold border ${dirClass}`}>
+                                {pos.direction}
+                              </span>
+                            </td>
+                            <td className="p-4">
+                              <div>Entry: ${pos.entry_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                              <div className="text-white font-bold mt-0.5">Exit: ${pos.exit_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                            </td>
+                            <td className={`p-4 font-bold ${rClass}`}>
+                              {rRealized >= 0 ? '+' : ''}{rRealized.toFixed(2)}R
+                            </td>
+                            <td className="p-4 font-sans text-xs">{reasonLabel || pos.status}</td>
+                            <td className="p-4 text-gray-400 text-xs">
+                              {pos.exit_ts ? new Date(pos.exit_ts).toLocaleString() : 'N/A'}
+                            </td>
+                            <td className="p-4 text-gray-400 font-sans text-xs truncate max-w-xs" title={pos.notes}>
+                              {pos.notes}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {closedPositions.length === 0 && (
+                        <tr>
+                          <td colSpan={8} className="p-8 text-center text-gray-500 font-sans text-xs">
+                            No closed positions in history.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Settings Tab */}
         {activeTab === 'settings' && (
           <div className="space-y-6 max-w-4xl animate-fade-in">
@@ -2040,6 +2399,226 @@ function App() {
                     Save Configuration
                   </button>
                 </div>
+              </div>
+            </div>
+
+            {/* Saxo Bank OpenAPI Credentials Card */}
+            <div className="glass border border-white/5 p-6 rounded-xl space-y-6 bg-black/20">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-lg text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.1)]">
+                    🔑
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm text-white">Saxo OpenAPI Credentials</h3>
+                    <p className="text-[10px] text-gray-400">Configure connection details for live/simulation market feeds</p>
+                  </div>
+                </div>
+                
+                {/* Connection Status Badge */}
+                <div className="flex items-center gap-2 self-start sm:self-center">
+                  <span className="text-[10px] text-gray-500 font-mono">Status:</span>
+                  <span className={`text-[10px] font-mono px-2.5 py-1 rounded-full border ${
+                    saxoCreds.isAuthenticated 
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.1)]' 
+                      : 'bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-[0_0_10px_rgba(244,63,94,0.1)]'
+                  }`}>
+                    {saxoCreds.isAuthenticated ? 'Connected' : 'Disconnected / Expired'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Left Column: API Credentials */}
+                <div className="space-y-4">
+                  {/* Environment Select Toggle */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] text-gray-400 uppercase font-bold">Environment</label>
+                    <select
+                      value={saxoCreds.openApiBase === 'https://gateway.saxobank.com/openapi' ? 'live' : 'sim'}
+                      onChange={(e) => {
+                        const env = e.target.value;
+                        setSaxoCreds(prev => ({
+                          ...prev,
+                          openApiBase: env === 'live' ? 'https://gateway.saxobank.com/openapi' : 'https://gateway.saxobank.com/sim/openapi',
+                          authBase: env === 'live' ? 'https://live.authenticator.saxobank.com/oauth2' : 'https://sim.authenticator.saxobank.com/oauth2',
+                          redirectUrl: env === 'live' ? 'https://live.authenticator.saxobank.com/oauth2/callback' : 'http://localhost:8080/auth/saxo/callback',
+                        }));
+                      }}
+                      className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer"
+                    >
+                      <option value="sim">Simulation (Demo / Paper Trading)</option>
+                      <option value="live">Live (Real Account / Production)</option>
+                    </select>
+                  </div>
+
+                  {/* App Key */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] text-gray-400 uppercase font-bold">App Key (Client ID)</label>
+                    <div className="relative">
+                      <input
+                        type={showAppKey ? 'text' : 'password'}
+                        placeholder="Paste Saxo OpenAPI App Key..."
+                        value={saxoCreds.appKey || ''}
+                        onChange={(e) => setSaxoCreds(prev => ({ ...prev, appKey: e.target.value }))}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg pl-3 pr-10 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowAppKey(!showAppKey)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition text-xs"
+                      >
+                        {showAppKey ? '👁️' : '👁️‍🗨️'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* App Secret */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] text-gray-400 uppercase font-bold">App Secret (Client Secret)</label>
+                    <div className="relative">
+                      <input
+                        type={showAppSecret ? 'text' : 'password'}
+                        placeholder="Paste Saxo OpenAPI App Secret..."
+                        value={saxoCreds.appSecret || ''}
+                        onChange={(e) => setSaxoCreds(prev => ({ ...prev, appSecret: e.target.value }))}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg pl-3 pr-10 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowAppSecret(!showAppSecret)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition text-xs"
+                      >
+                        {showAppSecret ? '👁️' : '👁️‍🗨️'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column: Access & Refresh Tokens */}
+                <div className="space-y-4">
+                  {/* 24h Access Token */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] text-gray-400 uppercase font-bold">24h Access Token</label>
+                    <div className="relative">
+                      {showAccessToken ? (
+                        <textarea
+                          rows={3}
+                          placeholder="Paste your 24h Saxo OpenAPI Access Token..."
+                          value={saxoCreds.accessToken || ''}
+                          onChange={(e) => setSaxoCreds(prev => ({ ...prev, accessToken: e.target.value }))}
+                          className="w-full bg-black/40 border border-white/10 rounded-lg pl-3 pr-10 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 font-mono resize-none"
+                        />
+                      ) : (
+                        <input
+                          type="password"
+                          placeholder="Paste your 24h Saxo OpenAPI Access Token..."
+                          value={saxoCreds.accessToken || ''}
+                          onChange={(e) => setSaxoCreds(prev => ({ ...prev, accessToken: e.target.value }))}
+                          className="w-full bg-black/40 border border-white/10 rounded-lg pl-3 pr-10 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 font-mono"
+                        />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setShowAccessToken(!showAccessToken)}
+                        className="absolute right-3 top-4 text-gray-500 hover:text-white transition text-xs"
+                      >
+                        {showAccessToken ? '👁️' : '👁️‍🗨️'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Refresh Token */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] text-gray-400 uppercase font-bold">Refresh Token (Optional)</label>
+                    <div className="relative">
+                      <input
+                        type={showRefreshToken ? 'text' : 'password'}
+                        placeholder="Optional Refresh Token..."
+                        value={saxoCreds.refreshToken || ''}
+                        onChange={(e) => setSaxoCreds(prev => ({ ...prev, refreshToken: e.target.value }))}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg pl-3 pr-10 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowRefreshToken(!showRefreshToken)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition text-xs"
+                      >
+                        {showRefreshToken ? '👁️' : '👁️‍🗨️'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Advanced Collapsible Accordion */}
+              <details className="group border-t border-white/5 pt-4">
+                <summary className="list-none flex items-center justify-between cursor-pointer text-[10px] text-gray-500 uppercase tracking-wider select-none font-bold hover:text-gray-300 transition">
+                  <span>Advanced Base URIs & Callback</span>
+                  <span className="transition-transform group-open:rotate-180">▼</span>
+                </summary>
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <label className="block text-[9px] text-gray-500 uppercase font-bold">OpenAPI Base URL</label>
+                    <input
+                      type="text"
+                      value={saxoCreds.openApiBase}
+                      onChange={(e) => setSaxoCreds(prev => ({ ...prev, openApiBase: e.target.value }))}
+                      className="w-full bg-black/60 border border-white/10 rounded-lg px-2.5 py-2 text-[10px] text-gray-300 font-mono focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-[9px] text-gray-500 uppercase font-bold">Authentication Base URL</label>
+                    <input
+                      type="text"
+                      value={saxoCreds.authBase}
+                      onChange={(e) => setSaxoCreds(prev => ({ ...prev, authBase: e.target.value }))}
+                      className="w-full bg-black/60 border border-white/10 rounded-lg px-2.5 py-2 text-[10px] text-gray-300 font-mono focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-[9px] text-gray-500 uppercase font-bold">Redirect / Callback URL</label>
+                    <input
+                      type="text"
+                      value={saxoCreds.redirectUrl}
+                      onChange={(e) => setSaxoCreds(prev => ({ ...prev, redirectUrl: e.target.value }))}
+                      className="w-full bg-black/60 border border-white/10 rounded-lg px-2.5 py-2 text-[10px] text-gray-300 font-mono focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </details>
+
+              {/* Save Credentials Button */}
+              <div className="border-t border-white/5 pt-4 flex justify-end">
+                <button
+                  onClick={async () => {
+                    try {
+                      const response = await fetch('/api/settings/saxo_token', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(saxoCreds)
+                      });
+                      const result = await response.json();
+                      if (response.ok && result.status === 'success') {
+                        if (result.isAuthenticated) {
+                          showToast('Saxo tokens updated and connected successfully!', 'success');
+                        } else {
+                          showToast(result.warning || 'Tokens updated, but connection check failed.', 'info');
+                        }
+                        // Refresh data to get masked values and latest authentication state
+                        fetchData();
+                      } else {
+                        showToast(result.error || 'Failed to update Saxo tokens', 'error');
+                      }
+                    } catch (e) {
+                      console.error('Failed to save Saxo credentials:', e);
+                      showToast('Error connecting to backend API', 'error');
+                    }
+                  }}
+                  className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg px-6 py-2.5 transition shadow-[0_0_15px_rgba(59,130,246,0.2)] flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  <span>🔌</span> Connect Saxo Bank API
+                </button>
               </div>
             </div>
           </div>

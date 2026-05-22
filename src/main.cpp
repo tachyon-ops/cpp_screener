@@ -433,6 +433,109 @@ int main() {
         }
     }
 
+    // Ensure Phase 7 instruments daily bars are seeded
+    auto btcusd_inst = store->get_instrument_by_symbol("BTCUSD");
+    auto ethusd_inst = store->get_instrument_by_symbol("ETHUSD");
+    auto ndx_inst = store->get_instrument_by_symbol("NDX");
+    auto n225_inst = store->get_instrument_by_symbol("^N225");
+    auto stoxx_inst = store->get_instrument_by_symbol("^STOXX");
+
+    if (btcusd_inst && ethusd_inst && ndx_inst && n225_inst && stoxx_inst) {
+        auto btc_bars = store->get_bars_daily(btcusd_inst->id);
+        if (btc_bars.size() < 100) {
+            std::cout << "[Engine] Seeding mock historical daily bars for Phase 7 instruments (BTCUSD, ETHUSD, NDX, ^N225, ^STOXX)..." << std::endl;
+            
+            auto is_weekend_fn = [](const std::string& date_str) -> bool {
+                struct tm t = {};
+                if (sscanf(date_str.c_str(), "%d-%d-%d", &t.tm_year, &t.tm_mon, &t.tm_mday) == 3) {
+                    t.tm_year -= 1900;
+                    t.tm_mon -= 1;
+                    mktime(&t);
+                    return (t.tm_wday == 0 || t.tm_wday == 6);
+                }
+                return false;
+            };
+
+            auto get_trading_days_back_fn = [&](const std::string& start_date, int count) -> std::vector<std::string> {
+                std::vector<std::string> dates;
+                int days_offset = 0;
+                while (dates.size() < (size_t)count) {
+                    std::string d = add_days(start_date, -days_offset);
+                    if (!is_weekend_fn(d)) {
+                        dates.push_back(d);
+                    }
+                    days_offset++;
+                }
+                std::reverse(dates.begin(), dates.end());
+                return dates;
+            };
+
+            std::vector<std::string> dates = get_trading_days_back_fn(today_date, 100);
+
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::normal_distribution<> pct_change(0.0002, 0.005);
+            std::normal_distribution<> noise(0.0, 0.001);
+            std::uniform_real_distribution<> vol_dist(40000.0, 80000.0);
+
+            double p_btc = 60000.0;
+            double p_eth = 3000.0;
+            double p_ndx = 17000.0;
+            double p_n225 = 38000.0;
+            double p_stoxx = 4500.0;
+
+            for (size_t i = 0; i < dates.size(); ++i) {
+                double r_base = pct_change(gen);
+                double r_btc = r_base + noise(gen);
+                double r_eth = r_base + noise(gen);
+                double r_ndx = r_base + noise(gen);
+                double r_n225 = r_base + noise(gen);
+                double r_stoxx = r_base + noise(gen);
+
+                // Overwrite the last day to trigger divergence (Screen G)
+                if (i == dates.size() - 1) {
+                    r_btc = -0.05;
+                    r_eth = -0.05;
+                    r_n225 = -0.05;
+                    r_ndx = 0.02;
+                    r_stoxx = 0.02;
+                }
+
+                p_btc *= (1.0 + r_btc);
+                p_eth *= (1.0 + r_eth);
+                p_ndx *= (1.0 + r_ndx);
+                p_n225 *= (1.0 + r_n225);
+                p_stoxx *= (1.0 + r_stoxx);
+
+                auto save_bar = [&](int64_t inst_id, double close, double volume, const std::string& dt) {
+                    persistence::DbBarDaily bar;
+                    bar.instrument_id = inst_id;
+                    bar.date = dt;
+                    bar.open = close / (1.0 + (i == dates.size() - 1 ? 0.02 : 0.0));
+                    bar.close = close;
+                    if (i == dates.size() - 1 && inst_id == btcusd_inst->id) {
+                        bar.open = 57000.0;
+                        bar.high = 57200.0;
+                        bar.low = 53000.0;
+                        bar.close = 56000.0;
+                        bar.volume = 150000.0;
+                    } else {
+                        bar.high = std::max(bar.open, bar.close) * 1.002;
+                        bar.low = std::min(bar.open, bar.close) * 0.998;
+                        bar.volume = volume;
+                    }
+                    store->add_bar_daily(bar);
+                };
+
+                save_bar(btcusd_inst->id, p_btc, vol_dist(gen), dates[i]);
+                save_bar(ethusd_inst->id, p_eth, vol_dist(gen), dates[i]);
+                save_bar(ndx_inst->id, p_ndx, vol_dist(gen), dates[i]);
+                save_bar(n225_inst->id, p_n225, vol_dist(gen), dates[i]);
+                save_bar(stoxx_inst->id, p_stoxx, vol_dist(gen), dates[i]);
+            }
+        }
+    }
+
     // Prime the data with an initial evaluation
     std::cout << "[Engine] Seeding/Calculating initial EOD regime and Screen D rotation board..." << std::endl;
     classifier->evaluate(today_date, 14.5, 3.25, 0.76, 520.0);
@@ -440,6 +543,8 @@ int main() {
     screen_b->evaluate(today_date);
     screen_e->evaluate(today_date);
     screen_f->evaluate(today_date);
+    screen_g->evaluate(today_date);
+    screen_c->evaluate(today_date);
 
     // 5. Seed sample regime & alerts if tables are empty, so the UI is immediately wowed
     if (store->get_alerts(1).empty()) {
@@ -499,6 +604,59 @@ int main() {
         ts_store->pre_populate(inst.symbol, base_price);
     }
 
+    // Call screen_c->add_to_watch("BTCUSD", 72) on startup
+    screen_c->add_to_watch("BTCUSD", 72);
+
+    // Append custom capitulation wick bar for BTCUSD to H1, H4, and D1 in ts_store
+    auto btc_ts = ts_store->get("BTCUSD");
+    if (btc_ts) {
+        core::Bar wick_bar;
+        wick_bar.ts.ms_since_epoch = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        wick_bar.open.value = 57000.0;
+        wick_bar.high.value = 57200.0;
+        wick_bar.low.value = 53000.0;
+        wick_bar.close.value = 56000.0;
+        wick_bar.volume.value = 150000.0;
+        btc_ts->append_bar(wick_bar, core::Resolution::H1);
+        btc_ts->append_bar(wick_bar, core::Resolution::H4);
+        btc_ts->append_bar(wick_bar, core::Resolution::D1);
+
+        // Also append a tick to ensure latest price in ts_store is 56000.0 for position manager BE trigger
+        core::Tick t;
+        t.ts.ms_since_epoch = wick_bar.ts.ms_since_epoch;
+        t.bid.value = 56000.0;
+        t.ask.value = 56000.0;
+        btc_ts->append_tick(t);
+    }
+
+    // Seed mock active position for BTCUSD (entry 55000, stop 53000, status open)
+    auto btc_inst = store->get_instrument_by_symbol("BTCUSD");
+    if (btc_inst) {
+        auto positions = store->get_positions();
+        bool has_btc = false;
+        for (const auto& p : positions) {
+            if (p.instrument_id == btc_inst->id && p.status == "open") {
+                has_btc = true;
+                break;
+            }
+        }
+        if (!has_btc) {
+            persistence::DbPosition pos;
+            pos.alert_id = 0;
+            pos.instrument_id = btc_inst->id;
+            pos.direction = "long";
+            pos.entry_ts = get_current_utc_timestamp();
+            pos.entry_price = 55000.0;
+            pos.size = 0.5;
+            pos.initial_stop = 53000.0;
+            pos.current_stop = 53000.0;
+            pos.status = "open";
+            pos.notes = "Mock active position";
+            store->add_position(pos);
+            std::cout << "[Engine] Seeded mock active position for BTCUSD." << std::endl;
+        }
+    }
+
     // 6. Subscribe to live quotes on seeded instruments to simulate screener data feed
     std::cout << "[Engine] Connecting quote subscriptions to core screener feed..." << std::endl;
     existing_instruments = store->get_instruments();
@@ -524,7 +682,7 @@ int main() {
     }
 
     // 7. Background screener thread to periodically evaluate regimes & screens
-    std::thread screener_thread([store, http_server, classifier, screen_d, screen_b, dispatcher, screen_a, screen_e, screen_f]() {
+    std::thread screener_thread([store, http_server, classifier, screen_d, screen_b, dispatcher, screen_a, screen_e, screen_f, screen_g, screen_c]() {
         std::random_device rd;
         std::mt19937 gen(rd());
         std::normal_distribution<> vix_walk(0.0, 0.4);
@@ -566,6 +724,8 @@ int main() {
             screen_a->evaluate(date);
             screen_e->evaluate(date);
             screen_f->evaluate(date);
+            screen_g->evaluate(date);
+            screen_c->evaluate(date);
 
             // Fetch the updated log to broadcast
             auto logs = store->get_regime_log(1);
@@ -590,6 +750,10 @@ int main() {
 
     // 8. Block main thread until shutdown signal, or run webview if supported/enabled
     bool gui_enabled = true;
+    
+    if (std::getenv("HEADLESS") != nullptr && std::string(std::getenv("HEADLESS")) == "true") {
+        gui_enabled = false;
+    }
     
     // Check environment variable on Linux for headless setup
 #if defined(__linux__)
@@ -627,6 +791,7 @@ int main() {
     if (screener_thread.joinable()) {
         screener_thread.join();
     }
+    position_manager->stop();
     dispatcher->stop();
     tg_bot->stop();
     http_server->stop();

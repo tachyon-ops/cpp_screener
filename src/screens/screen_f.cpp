@@ -183,55 +183,68 @@ void ScreenF::evaluate(const std::string& date) {
 
             // Dispatch alert
             if (dispatcher_) {
-                core::Alert alert;
-
                 auto now = std::chrono::system_clock::now();
-                auto time_t_now = std::chrono::system_clock::to_time_t(now);
-                std::stringstream ts_ss;
-                ts_ss << std::put_time(std::gmtime(&time_t_now), "%Y-%m-%dT%H:%M:%SZ");
-
-                alert.ts = ts_ss.str();
-                alert.screen = "F";
-                alert.tier = setup_tier;
-                alert.instrument_id = inst.id;
-                alert.symbol = symbol;
-
-                std::string regime_str = "Chop";
-                auto logs = store_->get_regime_log(1);
-                if (!logs.empty()) {
-                    regime_str = logs[0].regime;
+                
+                // Check 24-hour cooldown for alert dispatch
+                bool allowed = false;
+                {
+                    std::lock_guard<std::mutex> lock(cooldowns_mutex_);
+                    auto it = cooldowns_.find(symbol);
+                    if (it == cooldowns_.end() || now >= it->second) {
+                        cooldowns_[symbol] = now + std::chrono::hours(24);
+                        allowed = true;
+                    }
                 }
-                alert.regime_at_alert = regime_str;
 
-                alert.suggested_entry_low = current_price;
-                alert.suggested_entry_high = current_price;
-                
-                // Suggested stop is 1% below box top (which is now support)
-                alert.suggested_stop = box_top * 0.99;
-                
-                double risk = current_price - alert.suggested_stop;
-                alert.target_1 = current_price + 2.0 * risk;
-                alert.target_2 = current_price + 4.0 * risk;
-                alert.target_3 = current_price + 6.0 * risk;
-                alert.rr_to_target_1 = 2.0;
+                if (allowed) {
+                    core::Alert alert;
+                    auto time_t_now = std::chrono::system_clock::to_time_t(now);
+                    std::stringstream ts_ss;
+                    ts_ss << std::put_time(std::gmtime(&time_t_now), "%Y-%m-%dT%H:%M:%SZ");
 
-                alert.confluence_factors.push_back("Box height: " + std::to_string(box_height_pct * 100.0) + "%");
-                alert.confluence_factors.push_back("Consolidation: " + std::to_string(consolidation_days) + " days");
-                alert.confluence_factors.push_back("Volume spike: " + std::to_string(volume_ratio) + "x");
-                alert.confluence_factors.push_back("Sector above 200MA: " + std::string(sector_above_ma200 ? "Yes" : "No"));
+                    alert.ts = ts_ss.str();
+                    alert.screen = "F";
+                    alert.tier = setup_tier;
+                    alert.instrument_id = inst.id;
+                    alert.symbol = symbol;
 
-                alert.news_summary = "Stock breaks out of a " + std::to_string(consolidation_days) + "-day Darvas consolidation box on high volume.";
+                    std::string regime_str = "Chop";
+                    auto logs = store_->get_regime_log(1);
+                    if (!logs.empty()) {
+                        regime_str = logs[0].regime;
+                    }
+                    alert.regime_at_alert = regime_str;
 
-                alert.extra["box_top"] = box_top;
-                alert.extra["box_bottom"] = box_bottom;
-                alert.extra["box_height_pct"] = box_height_pct;
-                alert.extra["consolidation_days"] = consolidation_days;
-                alert.extra["volume_ratio"] = volume_ratio;
-                alert.extra["sector_above_ma200"] = sector_above_ma200 ? 1.0 : 0.0;
+                    alert.suggested_entry_low = current_price;
+                    alert.suggested_entry_high = current_price;
+                    
+                    // Suggested stop is 1% below box top (which is now support)
+                    alert.suggested_stop = box_top * 0.99;
+                    
+                    double risk = current_price - alert.suggested_stop;
+                    alert.target_1 = current_price + 2.0 * risk;
+                    alert.target_2 = current_price + 4.0 * risk;
+                    alert.target_3 = current_price + 6.0 * risk;
+                    alert.rr_to_target_1 = 2.0;
 
-                alert.conviction_score = volume_ratio;
+                    alert.confluence_factors.push_back("Box height: " + std::to_string(box_height_pct * 100.0) + "%");
+                    alert.confluence_factors.push_back("Consolidation: " + std::to_string(consolidation_days) + " days");
+                    alert.confluence_factors.push_back("Volume spike: " + std::to_string(volume_ratio) + "x");
+                    alert.confluence_factors.push_back("Sector above 200MA: " + std::string(sector_above_ma200 ? "Yes" : "No"));
 
-                dispatcher_->dispatch(alert);
+                    alert.news_summary = "Stock breaks out of a " + std::to_string(consolidation_days) + "-day Darvas consolidation box on high volume.";
+
+                    alert.extra["box_top"] = box_top;
+                    alert.extra["box_bottom"] = box_bottom;
+                    alert.extra["box_height_pct"] = box_height_pct;
+                    alert.extra["consolidation_days"] = consolidation_days;
+                    alert.extra["volume_ratio"] = volume_ratio;
+                    alert.extra["sector_above_ma200"] = sector_above_ma200 ? 1.0 : 0.0;
+
+                    alert.conviction_score = volume_ratio;
+
+                    dispatcher_->dispatch(alert);
+                }
             }
         }
     }

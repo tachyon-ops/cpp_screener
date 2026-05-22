@@ -264,28 +264,41 @@ void ScreenD::evaluate(const std::string& date) {
                                (close_prev >= ma200_prev && close < ma200);
 
             if (crossed_200) {
-                core::Alert alert;
-                alert.ts = date + "T16:00:00Z"; 
-                alert.screen = "D";
-                alert.tier = "interesting";
-                alert.instrument_id = inst_id;
-                alert.symbol = symbol;
-                
-                std::string regime_str = "Chop";
-                auto logs = store_->get_regime_log(1);
-                if (!logs.empty()) {
-                    regime_str = logs[0].regime;
+                bool allowed = false;
+                auto now = std::chrono::system_clock::now();
+                {
+                    std::lock_guard<std::mutex> lock(cooldowns_mutex_);
+                    auto it = cooldowns_.find(symbol);
+                    if (it == cooldowns_.end() || now >= it->second) {
+                        cooldowns_[symbol] = now + std::chrono::hours(24);
+                        allowed = true;
+                    }
                 }
-                alert.regime_at_alert = regime_str;
 
-                alert.suggested_entry_low = close;
-                alert.suggested_entry_high = close;
-                alert.suggested_stop = close * (close > ma200 ? 0.98 : 1.02); // 2% risk stop
-                alert.target_1 = close * (close > ma200 ? 1.06 : 0.94);      // 3R target
-                alert.rr_to_target_1 = 3.0;
-                alert.conviction_score = 1.0;
+                if (allowed) {
+                    core::Alert alert;
+                    alert.ts = date + "T16:00:00Z"; 
+                    alert.screen = "D";
+                    alert.tier = "interesting";
+                    alert.instrument_id = inst_id;
+                    alert.symbol = symbol;
+                    
+                    std::string regime_str = "Chop";
+                    auto logs = store_->get_regime_log(1);
+                    if (!logs.empty()) {
+                        regime_str = logs[0].regime;
+                    }
+                    alert.regime_at_alert = regime_str;
 
-                dispatcher_->dispatch(alert);
+                    alert.suggested_entry_low = close;
+                    alert.suggested_entry_high = close;
+                    alert.suggested_stop = close * (close > ma200 ? 0.98 : 1.02); // 2% risk stop
+                    alert.target_1 = close * (close > ma200 ? 1.06 : 0.94);      // 3R target
+                    alert.rr_to_target_1 = 3.0;
+                    alert.conviction_score = 1.0;
+
+                    dispatcher_->dispatch(alert);
+                }
             }
         }
     }
